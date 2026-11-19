@@ -208,3 +208,70 @@ question is unanswerable no matter what the pipeline does, and 43% of the
 index is occupied by chunks that cannot ground an answer, which also costs
 retrieval precision. Getting the Confluence bodies is worth more than any
 remaining pipeline work.
+
+## Does filtering stubs in SQL help? Yes, but only the ordering
+
+Measured on the deployed runtime (the databases are private, so the sweep
+runs inside the VPC where the data already is), 35 golden questions, same
+set arithmetic, the only variable being the groundable predicate.
+
+| Strategy | filter | hit@5 | MRR | nDCG@5 | precision@5 |
+|---|---|---|---|---|---|
+| R1_dense | off | 0.97 | 0.89 | 0.91 | 0.51 |
+| R1_dense | **on** | 0.97 | 0.91 | 0.93 | 0.51 |
+| R3_hybrid | off | 0.97 | 0.92 | 0.93 | 0.50 |
+| R3_hybrid | **on** | 0.97 | 0.95 | 0.95 | 0.50 |
+| **R4_hybrid_dated** (production) | off | 0.97 | 0.89 | 0.91 | 0.46 |
+| **R4_hybrid_dated** (production) | **on** | 0.97 | **0.95** | **0.95** | 0.46 |
+| R2_lexical | off | 0.23 | 0.23 | 1.00 | 0.21 |
+| R2_lexical | **on** | 0.23 | 0.23 | 1.00 | 0.21 |
+
+The production strategy gains **MRR 0.89 → 0.95 and nDCG 0.91 → 0.95**. The
+right document moves up the ranking because stubs no longer occupy the slots
+above it. The filter is kept on that evidence.
+
+Three things did **not** happen, and each is worth more than the gain.
+
+**hit@5 did not move.** It was already 0.97. The right document was always
+being retrieved; stubs were burying it, not excluding it.
+
+**precision@5 did not move.** Removing a stub frees a slot that the next
+chunk immediately fills, so the ratio is unchanged. This measure is also
+chunk-level, not document-level: every golden question has exactly one gold
+document, and a chunked document contributes several rows, so 0.46 means
+roughly half the retrieved chunks come from the right document. It is not
+the pile of slack an earlier draft of this document implied.
+
+**Lexical retrieval was completely unaffected** — 0.23 before and after, to
+two decimals. The hypothesis was that keyword-dense KB titles were winning
+lexical matches and poisoning that arm. The data says no. Lexical fails here
+because `tsv @@ plainto_tsquery` simply does not match at all on 77% of
+these questions: tickets say "salary not credited", rules say "wage ceiling".
+Its nDCG of 1.00 is a trap — when it retrieves anything the hit is at rank
+one, but it usually retrieves nothing relevant.
+
+## Was a re-ranker used? No. Would a cross-encoder help?
+
+No re-ranker is used. Retrieval is dense (Titan Embed v2, HNSW cosine) and
+lexical (Postgres `ts_rank_cd`) fused with Reciprocal Rank Fusion at k=60.
+Fusion reorders; it does not re-score a query against a passage jointly, so
+it is not a cross-encoder in any sense.
+
+**No re-ranker model is available on this account.** `ap-southeast-2` offers
+no `amazon.rerank` or `cohere.rerank`, only Cohere embedding models, and the
+account SCP pins the pilot to that one region. Self-hosting a cross-encoder
+in the runtime would mean shipping Torch and a model into a 24 MB artifact
+and paying CPU inference on the request path.
+
+The viable substitute is an LLM re-ranker: one Nova Micro call scoring 15
+candidates and returning the best 5. It is affordable, roughly USD 0.00002
+and 300 ms.
+
+It is not recommended, because the numbers say it would optimise the part
+that already works. A re-ranker improves ordering, and ordering is now MRR
+0.95 and nDCG 0.95 with hit@5 at 0.97 — about 0.05 of headroom. Meanwhile
+faithfulness sits at 0.814 against a 0.90 mark, and 300 ms would land on a
+request path already carrying 4.8 s of platform overhead.
+
+The retrieval stack is not the bottleneck. The knowledge base having no
+bodies is.
