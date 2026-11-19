@@ -52,8 +52,29 @@ def _rows_to_hits(rows, cosine: bool) -> list[Hit]:
 
 
 # ------------------------------------------------------------------ dense
+# A chunk carrying the stub marker is a KB index entry: a title and a pointer
+# to Confluence, with no body. It can never ground an answer — but its title
+# is keyword-dense, so it embeds and lexically matches *well* and wins top-k
+# slots that a groundable chunk should have had. 43% of the Indian index is
+# these.
+#
+# G9 filtered them out just before the draft, which removed the text but left
+# the slot spent: a top-5 was really a top-2.8. Filtering here frees the slot.
+#
+# This is deliberately a predicate on the text rather than a metadata column.
+# When the Confluence bodies are ingested the marker disappears on its own,
+# the filter quietly becomes a no-op, and there is no column to migrate and
+# no flag for anyone to remember to turn off.
+def _groundable_clause(sql: str, args: list, groundable: bool) -> str:
+    if groundable:
+        from .chunking import STUB_MARKER
+        sql += " AND text NOT LIKE %s"
+        args.append(f"%{STUB_MARKER}%")
+    return sql
+
+
 def dense(conn, strategy: str, vector, k: int, region: str | None = None,
-          as_of: date | None = None) -> list[Hit]:
+          as_of: date | None = None, groundable: bool = True) -> list[Hit]:
     sql = """
         SELECT chunk_id, source_type, source_id, heading, text,
                effective_from, effective_to,
@@ -63,6 +84,7 @@ def dense(conn, strategy: str, vector, k: int, region: str | None = None,
            AND embedding IS NOT NULL
     """
     args: list = [vector, strategy]
+    sql = _groundable_clause(sql, args, groundable)
     if region:
         sql += " AND region IN ('ALL', %s)"
         args.append(region)
@@ -77,7 +99,7 @@ def dense(conn, strategy: str, vector, k: int, region: str | None = None,
 
 # ---------------------------------------------------------------- lexical
 def lexical(conn, strategy: str, query: str, k: int, region: str | None = None,
-            as_of: date | None = None) -> list[Hit]:
+            as_of: date | None = None, groundable: bool = True) -> list[Hit]:
     sql = """
         SELECT chunk_id, source_type, source_id, heading, text,
                effective_from, effective_to,
@@ -87,6 +109,7 @@ def lexical(conn, strategy: str, query: str, k: int, region: str | None = None,
            AND tsv @@ plainto_tsquery('english', %s)
     """
     args: list = [query, strategy, query]
+    sql = _groundable_clause(sql, args, groundable)
     if region:
         sql += " AND region IN ('ALL', %s)"
         args.append(region)
@@ -125,23 +148,30 @@ def rrf(*rankings: list[Hit], k: int = TOP_K) -> list[Hit]:
 # ------------------------------------------------------------- front door
 def retrieve(conn, chunk_strategy: str, retrieval_strategy: str, question: str,
              k: int = TOP_K, region: str | None = None,
-             as_of: date | None = None) -> tuple[list[Hit], Usage | None]:
+             as_of: date | None = None,
+             groundable: bool = True,
+             vector=None) -> tuple[list[Hit], Usage | None]:
     """One call, whichever strategy. `region` and `as_of` are ignored by
     R1-R3 on purpose: the bake-off has to show what is lost without them."""
     usage = None
     if retrieval_strategy in ("R1_dense", "R3_hybrid", "R4_hybrid_dated"):
-        vector, usage = embed(question)
+        # A sweep comparing strategies must compare them on the SAME vector,
+        # or it is also measuring embedding jitter.
+        if vector is None:
+            vector, usage = embed(question)
 
     if retrieval_strategy == "R1_dense":
-        return dense(conn, chunk_strategy, vector, k), usage
+        return dense(conn, chunk_strategy, vector, k, groundable=groundable), usage
     if retrieval_strategy == "R2_lexical":
-        return lexical(conn, chunk_strategy, question, k), None
+        return lexical(conn, chunk_strategy, question, k, groundable=groundable), None
     if retrieval_strategy == "R3_hybrid":
-        d = dense(conn, chunk_strategy, vector, k * 3)
-        l = lexical(conn, chunk_strategy, question, k * 3)
+        d = dense(conn, chunk_strategy, vector, k * 3, groundable=groundable)
+        l = lexical(conn, chunk_strategy, question, k * 3, groundable=groundable)
         return rrf(d, l, k=k), usage
     if retrieval_strategy == "R4_hybrid_dated":
-        d = dense(conn, chunk_strategy, vector, k * 3, region=region, as_of=as_of)
-        l = lexical(conn, chunk_strategy, question, k * 3, region=region, as_of=as_of)
+        d = dense(conn, chunk_strategy, vector, k * 3, region=region, as_of=as_of,
+                  groundable=groundable)
+        l = lexical(conn, chunk_strategy, question, k * 3, region=region, as_of=as_of,
+                    groundable=groundable)
         return rrf(d, l, k=k), usage
     raise ValueError(retrieval_strategy)

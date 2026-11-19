@@ -27,14 +27,65 @@ class Invocation(BaseModel):
     as_of: str | None = None
     use_cache: bool = True
 
+    # Retrieval sweep, used by the bake-off. The databases are private, so
+    # the runtime inside the VPC is the only place this can run. It is not
+    # reachable from the internet: the proxy Lambda in front of the public
+    # endpoint filters the payload down to the five fields above, so this
+    # one is dropped before it ever gets here. Reaching it requires AWS
+    # credentials and a direct invoke-agent-runtime call.
+    eval_retrieval: list[dict] | None = None
+    eval_strategies: list[str] | None = None
+
 
 @app.get("/ping")
 def ping() -> dict:
     return {"status": "healthy", "service": "ramco-payce-pilot"}
 
 
+def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
+    """Retrieve only — no drafting, no model judgement. Returns what came
+    back so the caller can score it with set arithmetic."""
+    from .db import connect
+    from .bedrock import embed
+    from .retrieval import retrieve
+    from .config import TOP_K, REGIONS
+    from contextlib import ExitStack
+
+    out = []
+    with ExitStack() as stack:
+        conns = {r: stack.enter_context(connect(r)) for r in REGIONS}
+        for q in questions:
+            region = q.get("region") or "IN"
+            as_of = None
+            if q.get("as_of"):
+                y, m, d = q["as_of"].split("-")
+                as_of = date(int(y), int(m), int(d))
+            vector, _ = embed(q["question"])
+            for groundable in (False, True):
+                for rs in strategies:
+                    hits, _ = retrieve(conns[region], DEFAULT_CHUNKING, rs,
+                                       q["question"], k=TOP_K, region=region,
+                                       as_of=as_of, groundable=groundable,
+                                       vector=vector)
+                    out.append({
+                        "id": q.get("id"), "kind": q.get("kind"),
+                        "groundable": groundable, "retrieval": rs,
+                        "hits": [{"source_id": h.source_id, "sim": round(h.sim, 4),
+                                  "effective_from": str(h.effective_from) if h.effective_from else None,
+                                  "effective_to": str(h.effective_to) if h.effective_to else None}
+                                 for h in hits],
+                    })
+    return {"sweep": out, "n": len(out)}
+
+
 @app.post("/invocations")
 def invocations(payload: Invocation) -> dict:
+    if payload.eval_retrieval is not None:
+        return _retrieval_sweep(
+            payload.eval_retrieval,
+            payload.eval_strategies or ["R1_dense", "R2_lexical",
+                                        "R3_hybrid", "R4_hybrid_dated"])
+
     raw = payload.ticket or {
         "ticket_id": f"UI-{datetime.utcnow():%Y%m%d%H%M%S}",
         "channel": "email",
