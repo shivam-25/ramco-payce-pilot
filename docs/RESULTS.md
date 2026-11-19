@@ -357,3 +357,79 @@ The citation check answers "is this claim in the cited passage". It cannot
 answer "is this the passage's *operative* claim". That gap is not closable by
 checking harder at output time — it closes at indexing time, by not putting
 two competing answers in one retrievable unit.
+
+## The routing fix, applied and measured twice. Both worse. Reverted.
+
+The diagnosis on record — the classifier routes by the symptom the customer
+reports, the humans route by the system that must change — was left unapplied
+because it was untested. It has now been tested. It is correct, and acting on
+it still made the gate worse, twice.
+
+Same seeded stratified sample each time, 399 of 1,341 tickets, seed 20261119,
+so the three runs are directly comparable.
+
+| | on record | attempt 1 | attempt 2 |
+|---|---|---|---|
+| **Overall** | **90.0%** | 85.5% | 88.7% |
+| Access-Support | 100 | 100 | 100 |
+| Billing | 100 | 41.7 | 100 |
+| General-L1 | 100 | 100 | 100 |
+| Integrations | 70.3 | **97.3** | 70.3 |
+| Leave-Attendance | 100 | 60.0 | 100 |
+| Onboarding | 100 | 61.5 | 61.5 |
+| Payroll-Ops | 68.1 | **84.1** | 78.3 |
+| Reports-Analytics | 100 | 100 | 100 |
+| Statutory-Compliance | 79.4 | 70.6 | 73.5 |
+
+**Attempt 1** stated the rule explicitly and gave the four confusable pairs as
+worked examples. On the queues it aimed at it worked, and not by a little:
+Integrations 70.3 → 97.3, Payroll-Ops 68.1 → 84.1. It also pulled three
+untargeted queues off 100%. The examples were vivid about "a wrong figure is
+Payroll" and "a file that will not upload is Integration", and the model
+duly applied them to invoices, leave balances and go-live migrations. A rule
+was widened without being bounded.
+
+**Attempt 2** bounded it: the four pairs became tie-breakers to be used only
+after Billing, Leave & Attendance and Onboarding have been ruled out, since
+those are defined by what the ticket is about rather than by where the wrong
+data came from. Billing and Leave-Attendance returned to 100%. Onboarding did
+not move at all. And the Integrations gain — the single largest improvement
+either attempt produced — disappeared completely, back to exactly 70.3%.
+
+That last number is the interesting one. Adding a precedence step in front of
+the pairs did not merely scope them; it stopped them firing. The model reads
+the guard, works through three exclusions, and by the time it reaches the
+tie-breaker it has already settled. The instruction that fixed Integrations
+and the instruction that protects Billing cannot both be live in a single
+pass of a model this small.
+
+Reverted to the prompt measuring 90.0%. Keeping 88.7% would have traded 1.3
+points of the number the gate actually measures for two queues that look
+better in a per-queue table nobody is graded on.
+
+### What this cost and what it is worth
+
+Two eval runs, about fifty minutes of the account's 20 rpm quota and USD
+0.015 of classification. No production exposure: the change sat uncommitted
+throughout and the deployed runtime, v13, predates it.
+
+The honest read is that this is no longer a prompt problem. Three measured
+attempts (the dropdown at 84.8%, and these two) say the mapping from symptom
+to owning system is knowledge the triage SOP holds and the ticket text does
+not contain. A model choosing one of nine labels from two sentences cannot
+infer it, and writing more of the SOP into the system prompt trades one
+queue against another rather than adding information.
+
+Two options that would add information, neither attempted here:
+
+* **Retrieve the SOP rather than paraphrase it.** The triage SOP is already
+  in the corpus. Giving the classifier the three or four most similar SOP
+  passages for the ticket in hand puts the actual mapping in front of it
+  instead of a summary that has to cover all nine queues at once.
+* **Treat it as a classification problem, not a prompting one.** 1,341
+  tickets with human-assigned queues is a labelled training set. A small
+  supervised classifier over the ticket text would learn the symptom-to-owner
+  mapping from the data that already encodes it.
+
+The gate stays honestly failing at 90.0%, against an intake dropdown at
+84.8%. The pilot still fixes 43 of the 56 misroutes in the sample.
