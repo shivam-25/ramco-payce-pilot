@@ -5,17 +5,17 @@
 // removing them.
 export type Demo = {
   id: string; subject: string; body: string; customer: string;
-  asOf: string; note: string;
+  asOf: string; note: string; dated?: boolean;
 };
 
 export const TICKETS: Demo[] = [
   { id: "T-1", subject: "EPF wage ceiling for June payroll",
     body: "What EPF wage ceiling applies to our June 2026 payroll run?",
-    customer: "C-1001", asOf: "2026-06-15",
+    customer: "C-1001", asOf: "2026-06-15", dated: true,
     note: "The question the vendor pilot answered with September's rule." },
   { id: "T-2", subject: "EPF wage ceiling for September payroll",
     body: "What EPF wage ceiling applies to our September 2026 payroll run?",
-    customer: "C-1001", asOf: "2026-09-15",
+    customer: "C-1001", asOf: "2026-09-15", dated: true,
     note: "Same sentence, later period. The answer must change." },
   { id: "T-3", subject: "Salary not credited",
     body: "Salary of AED 1,000 was not received. IBAN AE07 0331 2345 6789 0123 456.",

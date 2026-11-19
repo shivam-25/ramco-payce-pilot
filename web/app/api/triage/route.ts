@@ -16,7 +16,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = await req.json();
+  // Only the fields the console sends are passed on. Forwarding the whole
+  // body would let anyone with the page's URL post eval_retrieval and run a
+  // strategy sweep on the account's budget -- the page is public, and the
+  // key that reaches AWS lives on this side of it.
+  const sent = await req.json();
+  const body = {
+    subject: String(sent.subject ?? "").slice(0, 400),
+    body: String(sent.body ?? "").slice(0, 4000),
+    customer_id: String(sent.customer_id ?? "").slice(0, 40),
+    as_of: typeof sent.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sent.as_of)
+      ? sent.as_of : null,
+    use_cache: sent.use_cache !== false,
+  };
   try {
     const r = await fetch(url, {
       method: "POST",

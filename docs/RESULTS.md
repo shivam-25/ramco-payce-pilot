@@ -275,3 +275,85 @@ request path already carrying 4.8 s of platform overhead.
 
 The retrieval stack is not the bottleneck. The knowledge base having no
 bodies is.
+
+## A correct citation, a current document, and the wrong number
+
+Found while building the period-comparison control, and the most serious
+defect in the pilot so far. It is the brief's original incident, reproduced
+with every date gate working.
+
+Ask the EPF wage ceiling question for a September period, but with a subject
+line that mentions June, and the reply came back:
+
+    The EPF wage ceiling for June payroll is INR 15,000 per month [1].
+
+INR 15,000 is the superseded figure. The correct September answer is 25,000.
+And yet:
+
+* retrieval returned the **right** document, R-IN-PF-2026-08;
+* that document is genuinely **in force** from 2026-08-01, so the date
+  filter was correct to return it;
+* the citation **points at it correctly**;
+* the grounding check **passed**, because the number really was in the cited
+  passage.
+
+Every gate did its job and the answer was still wrong. The cause was in the
+chunk text:
+
+    The value in force is: INR 25,000 per month. This replaced: INR 15,000
+    per month.
+
+One chunk, two numbers, only one of them the answer. A question phrased
+around the earlier period pulls the model to the wrong one, and because that
+figure is in the cited passage, nothing downstream can tell.
+
+What makes this worth writing down: the identical bug had already been found
+and fixed on the *prior-period* row, and the comment explaining the fix was
+sitting four lines below the line that still had it. Fixing a bug on one side
+of a symmetry is not fixing it.
+
+### The fix
+
+The superseded value is no longer carried on the in-force chunk. It is not
+lost — the prior period is its own row with its own date window, which is
+what makes "what applied in June" a lookup rather than an inference.
+
+Applied to the live corpus through a runtime migration: 16 statutory chunks
+rewritten **and re-embedded** (the text is what was embedded, so editing it
+without re-embedding would leave retrieval matching a sentence that is no
+longer there), and 23 cache entries dropped, since they had been drafted
+from the old text and would otherwise have kept serving the old answer.
+
+### Verified after
+
+| case | before | after |
+|---|---|---|
+| June-flavoured subject, September period | INR 15,000 ✗ | **INR 25,000** ✓ |
+| June-flavoured subject, June period | INR 15,000 ✓ | **INR 15,000** ✓ |
+| neutral subject, September period | INR 25,000 ✓ | **INR 25,000** ✓ |
+
+The June case still answers 15,000, from the prior-period row. The fix
+removes the trap without flattening the history.
+
+### No retrieval regression
+
+Re-measured on the 35-question golden set through the runtime, R4_hybrid_dated:
+
+| | after | on record |
+|---|---|---|
+| hit@5 | **1.00** | 0.97 |
+| MRR | **0.98** | 0.95 |
+| nDCG@5 | **0.98** | 0.95 |
+
+Scored over the **30 answerable** questions. The first pass scored all 35 and
+read 0.86/0.84/0.84 — the five misses were all `kind=unanswerable`, questions
+with no correct document by construction. They belong to the abstention
+measure, not this one; counting them here would mark correct abstentions as
+retrieval failures. All 7 statutory questions still retrieve their rule.
+
+### What this says about the gates
+
+The citation check answers "is this claim in the cited passage". It cannot
+answer "is this the passage's *operative* claim". That gap is not closable by
+checking harder at output time — it closes at indexing time, by not putting
+two competing answers in one retrievable unit.

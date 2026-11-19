@@ -6,6 +6,7 @@ deployed — there is no second code path for the cloud.
 """
 from __future__ import annotations
 import os
+import re
 from datetime import date, datetime
 
 from fastapi import FastAPI
@@ -36,10 +37,60 @@ class Invocation(BaseModel):
     eval_retrieval: list[dict] | None = None
     eval_strategies: list[str] | None = None
 
+    # A one-shot corpus migration, reachable only the same way the sweep is.
+    admin: str | None = None
+
 
 @app.get("/ping")
 def ping() -> dict:
     return {"status": "healthy", "service": "ramco-payce-pilot"}
+
+
+SUPERSEDED = re.compile(r"\s*This replaced:[^.]*\.")
+
+
+def _strip_superseded() -> dict:
+    """Remove the superseded value from in-force statutory chunks.
+
+    A chunk that carries both the value in force and the one it replaced is
+    a trap: a question phrased around the earlier period draws the model to
+    the older figure, which it then cites to a passage that genuinely is in
+    force. The date filter, the citation check and the grounding check all
+    pass, and the answer is wrong anyway. The old value is not lost -- the
+    prior period is its own row with its own window.
+
+    Re-embedding is the point: the text is what was embedded, so editing it
+    without re-embedding would leave retrieval matching the sentence that is
+    no longer there. tsv regenerates itself. The answer cache is emptied
+    because its entries were drafted from the old text -- a corpus change
+    that leaves the cache in place just serves the old answer instead."""
+    from .db import connect
+    from .bedrock import embed
+    from .config import REGIONS
+    from contextlib import ExitStack
+
+    done = {}
+    with ExitStack() as stack:
+        for region in REGIONS:
+            conn = stack.enter_context(connect(region))
+            rows = conn.execute(
+                "SELECT chunk_id, text FROM doc_chunks "
+                " WHERE source_type = 'statutory' AND text LIKE %s",
+                ("%This replaced:%",)).fetchall()
+            n = 0
+            for row in rows:
+                cid = row["chunk_id"] if isinstance(row, dict) else row[0]
+                old = row["text"] if isinstance(row, dict) else row[1]
+                new = SUPERSEDED.sub("", old)
+                if new == old:
+                    continue
+                vector, _ = embed(new)
+                conn.execute("UPDATE doc_chunks SET text = %s, embedding = %s "
+                             " WHERE chunk_id = %s", (new, vector, cid))
+                n += 1
+            cleared = conn.execute("DELETE FROM answer_cache").rowcount
+            done[region] = {"chunks_rewritten": n, "cache_entries_cleared": cleared}
+    return {"admin": "strip_superseded", "regions": done}
 
 
 def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
@@ -80,6 +131,9 @@ def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
 
 @app.post("/invocations")
 def invocations(payload: Invocation) -> dict:
+    if payload.admin == "strip_superseded":
+        return _strip_superseded()
+
     if payload.eval_retrieval is not None:
         return _retrieval_sweep(
             payload.eval_retrieval,

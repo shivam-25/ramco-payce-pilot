@@ -139,11 +139,19 @@ def build(strategy: str, rules: list[dict], kb: list[dict]) -> list[Chunk]:
     # asked BEFORE its change. An effective-dated store has to hold the old
     # period as its own row, with its own window, so "what applied in June"
     # is a lookup rather than an inference.
+    # The superseded value is deliberately NOT carried here, for the same
+    # reason it is not carried on the prior-period row below. A chunk holding
+    # both "in force: 25,000" and "this replaced: 15,000" is a trap: ask with
+    # a June-flavoured subject and the model reads the superseded figure off
+    # a passage that is genuinely in force, and cites it correctly. Every
+    # gate passes -- the date filter, the citation check, the grounding
+    # check -- and the reply is still wrong, which is the exact incident this
+    # pilot exists to prevent. The old value is not lost; it is the prior
+    # period's own row, with its own window.
     for r in rules:
         current = (f"Statutory rule {r['rule_id']} ({r['region']}, topic "
                    f"{r['topic']}): {r['title']}. "
                    f"The value in force is: {r.get('new_value')}. "
-                   f"This replaced: {r.get('old_value')}. "
                    f"Effective from {r['effective_from']}"
                    + (f" until {r['effective_to']}." if r.get("effective_to")
                       else " (currently in force).")
