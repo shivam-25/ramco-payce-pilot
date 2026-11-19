@@ -99,6 +99,16 @@ def run() -> dict:
     secs = [r["usage"].seconds for r in out]
     secs.sort()
 
+    # A gate that fails should say where. Without this the run reports
+    # "90%" and leaves the next person to re-measure for an hour to find
+    # out which queues it was.
+    import json as _json
+    (Path(__file__).resolve().parents[1] / "evals" / "reports"
+     / "g2_detail.json").write_text(_json.dumps(
+        [{"ticket_id": r.get("ticket_id"), "gold_queue": r["gold_queue"],
+          "pred_queue": r["pred_queue"], "intake_queue": r.get("intake_queue"),
+          "was_misrouted": r.get("was_misrouted")} for r in out], indent=1))
+
     return {
         "n": len(out), "sampled_from": total,
         "accuracy": acc, "accuracy_ci95": [round(lo, 4), round(hi, 4)],

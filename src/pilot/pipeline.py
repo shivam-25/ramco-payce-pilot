@@ -139,7 +139,7 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
 
         if use_cache:
             t0 = clock()
-            hit, usage = cache_lookup(conn, text, ticket.region)
+            hit, usage = cache_lookup(conn, text, ticket.region, as_of=as_of)
             meter.add(usage)
             t["cache"] = (clock() - t0) * 1000
             if hit:
@@ -192,7 +192,7 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
             res.citations = d.citations
             if use_cache:
                 cache_store(conn, text, ticket.region, d.text,
-                            d.citations, as_of)
+                            d.citations, as_of, passages=d.passages)
             _audit(conn, ticket.ticket_id, "drafted",
                    {"citations": d.citations})
 

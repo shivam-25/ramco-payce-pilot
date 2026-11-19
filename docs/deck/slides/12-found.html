@@ -1,0 +1,40 @@
+<!DOCTYPE html><html><head><style>html { background:#0B0E14; }
+body { width:720pt; height:405pt; margin:0; padding:0; background:#0B0E14;
+       font-family:Arial, Helvetica, sans-serif; display:flex; }
+.slide { margin:0; padding:34pt 40pt; width:720pt; height:405pt; box-sizing:border-box; }
+h1 { color:#E6E9EF; font-size:30pt; margin:0 0 6pt 0; letter-spacing:-0.4pt; }
+h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
+.kicker { color:#E8336D; font-size:10pt; margin:0 0 9pt 0; font-weight:bold;
+          letter-spacing:1.6pt; font-family:'Courier New', monospace; }
+.sub { color:#8B95A7; font-size:11.5pt; margin:0 0 14pt 0; line-height:1.4; }
+.body { color:#C6CCD8; font-size:11.5pt; margin:0 0 7pt 0; line-height:1.45; }
+.small { color:#8B95A7; font-size:9.5pt; margin:0; line-height:1.35; }
+.mono { font-family:'Courier New', monospace; }
+.card { background:#141922; border:1px solid #242C3A; border-radius:7pt; padding:13pt; }
+.num { color:#E8336D; font-size:30pt; margin:0; font-family:'Courier New', monospace; font-weight:bold; }
+.numlabel { color:#8B95A7; font-size:9pt; margin:3pt 0 0 0; line-height:1.3; }
+.ok { color:#3ECF8E; }
+.warn { color:#F2B134; }
+.accent { color:#E8336D; }
+.row { display:flex; gap:12pt; }
+
+.f{background:#141922;border:1px solid #242C3A;border-left:3pt solid #E8336D;border-radius:4pt;padding:9pt 11pt;margin:0 0 6pt 0;}
+.f p{margin:0;}
+.f .t{color:#E6E9EF;font-size:10pt;font-weight:bold;}
+.f .d{color:#8B95A7;font-size:8.5pt;margin-top:2pt;line-height:1.35;}
+.two{display:flex;gap:11pt;margin-top:11pt;}
+.two>div{width:314pt;}
+</style></head><body><div class="slide">
+<p class="kicker">WHAT MEASUREMENT FOUND THAT REVIEW DID NOT</p>
+<h1>Six defects. All of them mine.</h1>
+<div class="two"><div>
+<div class="f"><p class="t">The abstain threshold compared two different scales</p><p class="d">Rank-fusion scores sit near 0.016; the floor was a 0.55 cosine similarity. Everything looked irrelevant, so everything escalated.</p></div>
+<div class="f"><p class="t">Similarity cannot tell answerable from unanswerable</p><p class="d">Measured: answerable 0.20&ndash;0.65, unanswerable 0.28&ndash;0.50. The distributions overlap almost entirely, so no threshold works. Abstention moved to the model, verified in code.</p></div>
+<div class="f"><p class="t">The prior-period chunk named its own replacement</p><p class="d">A chunk describing June also said &ldquo;replaced by 25,000&rdquo;. The model read the new value off it and quoted it.</p></div>
+</div><div>
+<div class="f"><p class="t">The cache ignored time</p><p class="d">September matched June at 0.958 and was served June&rsquo;s answer &mdash; the original incident, reintroduced by an optimisation. Entries now carry a validity window. Gate G8.</p></div>
+<div class="f"><p class="t">A cited pointer passed as an answer</p><p class="d">&ldquo;The rate is in KB-0140, see Confluence.&rdquo; Also why Ragas scored faithfulness 0.756: a claim about where an answer lives is still an unsupported claim.</p></div>
+<div class="f"><p class="t">The PII gate understated its own work</p><p class="d">Notes buried in event histories were masked correctly and then reported as &ldquo;no personal data found&rdquo;. The quiet direction of error.</p></div>
+</div></div>
+<p class="small" style="margin-top:10pt;">Four of the six were found by a test the code had just passed. That is the argument for gates with numbers rather than a review with opinions.</p>
+</div></body></html>

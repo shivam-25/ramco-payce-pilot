@@ -30,3 +30,6 @@ node_modules/
 .next/
 .vercel/
 .DS_Store
+
+# Rendered slide PNGs are build output; the HTML in docs/deck is the source.
+docs/screenshots/*.png

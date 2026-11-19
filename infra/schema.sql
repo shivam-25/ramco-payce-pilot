@@ -118,6 +118,14 @@ CREATE TABLE IF NOT EXISTS answer_cache (
     answer       text NOT NULL,
     citations    jsonb NOT NULL DEFAULT '[]'::jsonb,
     as_of        date,
+    -- The window during which this cached answer is TRUE, taken from the
+    -- effective dates of the passages it was drafted from. Without it the
+    -- cache quietly undoes the effective-dating: a September question
+    -- matched a June question at 0.958 similarity and was served June's
+    -- answer, which is the precise failure the dated policy store exists to
+    -- prevent. Region was part of the key and time was not.
+    valid_from   date,
+    valid_to     date,
     created_at   timestamptz NOT NULL DEFAULT now(),
     hits         integer NOT NULL DEFAULT 0
 );
