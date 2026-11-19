@@ -37,12 +37,35 @@ carry all of it:
 | Integrations | 70.3% | 37 |
 | Statutory-Compliance | 79.4% | 34 |
 
-These three are semantically adjacent — a statutory deduction that came out
-wrong is simultaneously a payroll question, a compliance question, and
-possibly an integration question, and the triage SOP draws the line by where
-the wrong data *originated*. That is a distinction the prompt states once
-and the model applies inconsistently. It is a solvable problem and the next
-thing to work on, but it is not solved today.
+Classifying 150 more tickets drawn only from those three queues says what
+they are confused *with*, which is the part worth knowing:
+
+| Confusion | Rate |
+|---|---|
+| Integrations → Access-Support | 13/39 |
+| Payroll-Ops → Reports-Analytics | 8/76 |
+| Payroll-Ops → Integrations | 7/76 |
+| Payroll-Ops → Statutory-Compliance | 6/76 |
+| Statutory-Compliance → Integrations | 5/35 |
+
+One rule explains all five rows. **The classifier routes by the symptom the
+customer reports; the humans route by the system that has to change.** A
+failing SFTP connector is reported as "I can't log in", so it reads as
+Access-Support and is filed under Integrations. A payroll run that produced
+a wrong figure is reported as "the report is wrong", so it reads as
+Reports-Analytics and is filed under Payroll-Ops. The ticket text genuinely
+describes the symptom; only the triage SOP knows the mapping.
+
+That is a prompt and SOP problem rather than a model-capability one, and the
+fix is to state the rule explicitly — route by the system that must change,
+not by the symptom described — and give the three confusable pairs as worked
+examples.
+
+**This fix is not applied.** The hypothesis is untested, and shipping an
+unmeasured change to the production classifier would be worse than leaving
+the gate honestly failing. It needs one re-measure against the same seeded
+sample, which is about thirty minutes of the account's 20 rpm quota. The
+diagnosis is the deliverable here; the fix is the next session's first job.
 
 **Faithfulness, 0.814 against 0.90.** It moved from 0.756 when the output
 check began withholding pointer answers, and that is as far as that fix
