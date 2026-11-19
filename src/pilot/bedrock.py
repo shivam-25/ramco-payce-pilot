@@ -68,6 +68,7 @@ class _Limiter:
         delay = due - now
         if delay > 0:
             time.sleep(delay)
+            _add_throttle(delay)
 
     def penalise(self, model: str, seconds: float) -> None:
         """AWS pushed back, so hold the whole bucket, not just this thread.
@@ -82,6 +83,22 @@ class _Limiter:
 
 
 _limiter = _Limiter()
+
+# Time spent asleep waiting for quota, tallied per thread. The limiter sleeps
+# inside the call, so every box timing carries its wait; without this, a
+# latency measurement reports the account's rate limit rather than the work.
+_throttle = threading.local()
+
+
+def _add_throttle(seconds: float) -> None:
+    _throttle.s = getattr(_throttle, "s", 0.0) + seconds
+
+
+def take_throttle_s() -> float:
+    """Read this thread's throttle tally and reset it."""
+    was = getattr(_throttle, "s", 0.0)
+    _throttle.s = 0.0
+    return was
 
 
 def _with_backoff(fn, model: str, attempts: int = 8):
@@ -98,6 +115,7 @@ def _with_backoff(fn, model: str, attempts: int = 8):
             penalty = min(2 ** i, 45) * (0.5 + random.random())
             _limiter.penalise(model, penalty)
             time.sleep(penalty)
+            _add_throttle(penalty)
     raise RuntimeError("unreachable")
 _local = threading.local()
 

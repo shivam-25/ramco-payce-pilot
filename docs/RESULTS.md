@@ -75,6 +75,34 @@ model is Nova Lite, chosen because every Anthropic model on this account
 returns "Model use case details have not been submitted". A stronger drafter
 is the obvious next experiment and is currently blocked on a console form.
 
+## G7 latency: measured wrong, and not yet measured right
+
+The sweep reports a p95 of 25 seconds against a 3-second mark, and that
+number is not the pilot. Bedrock gives this account 20 requests a minute;
+the sweep asks for more, so most of those seconds are the eval harness
+asleep in a rate limiter.
+
+The first attempt to separate the two was wrong in an instructive way. It
+summed each box's own timing, on the assumption that box time was work time.
+It is not: the limiter sleeps *inside* the call the box is timing, so every
+box carries its own wait and the sum changed nothing. The limiter now tallies
+what it slept and the tally is subtracted from wall time.
+
+That correction is written and unit-tested but **has not been run against the
+pilot**, because closing the databases to the internet — the right thing to
+do, and done — also closed this machine's path to running the sweep locally.
+The gate is therefore recorded as not established rather than as a pass.
+
+What *is* measured is the deployed path. Every screenshot in `docs/screenshots`
+reports its own per-box timings from a real request through AgentCore, and
+they sum to about 1.5 seconds, of which the answer step is 472 ms. That is
+the customer path and it is comfortably inside the mark, but five hand-driven
+requests are evidence, not a p95, and this document will not call them one.
+
+The arithmetic that says the quota does not bind in production is in the
+test's own output: 15,000 tickets a month over 22 working days is 1.4
+requests a minute, 4.3 at a 3x peak, against a 10–20 rpm quota.
+
 ## Chunking and retrieval, chosen by measurement
 
 35 golden questions, k=5, scored with set arithmetic rather than a judge

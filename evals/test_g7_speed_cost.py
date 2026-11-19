@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _harness import record, REPORTS, parallel          # noqa: E402
 
 from pilot.config import DATA_ROOM                       # noqa: E402
-from pilot.bedrock import Meter                          # noqa: E402
+from pilot.bedrock import Meter, take_throttle_s         # noqa: E402
 from pilot.normalise import normalise                    # noqa: E402
 from pilot.pipeline import run_ticket                    # noqa: E402
 
@@ -65,8 +65,10 @@ def run() -> dict:
         try:
             res = run_ticket(r, meter=meter)
         except Exception as exc:          # a failure is a result, not a crash
-            return {"error": str(exc)[:120], "seconds": time.perf_counter() - t0}
-        return {"res": res, "seconds": time.perf_counter() - t0}
+            return {"error": str(exc)[:120], "seconds": time.perf_counter() - t0,
+                    "throttle": take_throttle_s()}
+        return {"res": res, "seconds": time.perf_counter() - t0,
+                "throttle": take_throttle_s()}
 
     out = parallel(one, sample, workers=4)
     errors = [o for o in out if "error" in o]
@@ -94,8 +96,10 @@ def run() -> dict:
     # those conditions p95 wall time is a measurement of the eval harness
     # queueing against a free-tier quota, not of what a customer would wait.
     #
-    # `service` is the sum of the boxes' own timings: the work actually done
-    # on the ticket. That is what a customer experiences, and it is the
+    # `service` is wall time minus the measured sleep: the work actually done
+    # on the ticket. Summing the boxes' own timings does NOT work here, because
+    # the limiter sleeps inside the call being timed, so every box carries its
+    # own wait. The limiter tallies what it slept and the tally is subtracted. That is what a customer experiences, and it is the
     # honest number to gate on here, because production volume does not
     # queue — the arithmetic printed below works out at 1.4 requests a
     # minute against a 10-20 rpm quota.
@@ -104,7 +108,7 @@ def run() -> dict:
     # move; reporting the pair and saying which one the gate uses, and why,
     # is the defensible one. If production volume ever approached the quota,
     # wall time would become the real number and this note would be wrong.
-    service = sorted(sum(o["res"].timings_ms.values()) / 1000.0 for o in ok)
+    service = sorted(o["seconds"] - o["throttle"] for o in ok)
 
     def pct(xs, q):
         return xs[min(len(xs) - 1, int(len(xs) * q))] if xs else 0
