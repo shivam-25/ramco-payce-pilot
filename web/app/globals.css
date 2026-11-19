@@ -117,3 +117,27 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
   color: var(--dim); }
 .cmpdraft { margin: 10px 0 0; font-size: 16px; line-height: 1.7; }
 .cmpnote { margin: 10px 0 0; font-size: 12.5px; color: var(--mut); max-width: 62ch; }
+
+/* The brief's day-one numbers, measured from what is on screen rather than
+   quoted. They appear once there is something to measure. */
+.board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  margin: 24px 0 0; padding: 0; border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line); }
+@media (max-width: 720px) { .board { grid-template-columns: repeat(2, 1fr); } }
+.board > div { padding: 14px 16px 13px; }
+.board > div + div { box-shadow: -1px 0 0 var(--line); }
+.board dt { font-size: 11.5px; color: var(--mut); }
+.board dd { margin: 4px 0 0; font-size: 21px; font-family: var(--mono);
+  letter-spacing: -.02em; }
+.board dd.good { color: var(--ok); }
+.board dd.bad { color: var(--accent); }
+.board dfn { display: block; margin-top: 2px; font-style: normal;
+  font-size: 11px; color: var(--dim); }
+
+.rail { margin: 0 0 8px 10px; font-size: 11px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--dim); }
+.tally { margin: 16px 0 0; padding-top: 13px; border-top: 1px solid var(--line);
+  font-size: 11.5px; line-height: 1.5; color: var(--dim); }
+
+.asof { color: var(--ink); }
+.staleline { margin: 14px 0 0; font-size: 13px; color: var(--accent); }

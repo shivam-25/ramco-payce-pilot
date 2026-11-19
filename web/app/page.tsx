@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TICKETS, BURST, type Demo } from "./lib/demo";
 import { status, withMarkers, period, pretty, pool, readable, heading, neutralise,
-         type Row, type Result, type Source } from "./lib/types";
+         score, stale, type Row, type Result, type Source } from "./lib/types";
 
 const mk = (d: Demo): Row => ({
   key: d.id, subject: d.subject, body: d.body, customer: d.customer,
@@ -75,14 +75,15 @@ export default function Console() {
   const cur = rows.find((r) => r.key === sel) ?? rows[0];
   const done = rows.filter((r) => r.state === "done" && r.result);
   const incident = done.find((r) => r.result!.incident);
-  const spend = done.reduce((a, r) => a + (r.result!.usd || 0), 0);
+  const board = score(rows);
 
   return (
     <main className="shell">
       <header className="top">
         <div className="brand">
           <h1>Payce Support</h1>
-          <p>Drafts replies for payroll and statutory tickets. Nothing is sent, and nothing is paid.</p>
+          <p>Drafts replies to payroll tickets, and ties every answer to the date
+             the rule was in force. Nothing is sent, and nothing is paid.</p>
         </div>
         <div className="actions">
           <button className="ghost" onClick={addRepeats} disabled={busy}>Add repeat reports</button>
@@ -100,8 +101,26 @@ export default function Console() {
         </p>
       )}
 
+      {board && (
+        <dl className="board">
+          <div><dt>Replies carrying a citation</dt>
+               <dd className={board.cited === "100%" ? "good" : ""}>{board.cited}</dd>
+               <dfn>target 100%, from 48% today</dfn></div>
+          <div><dt>Citations from the wrong period</dt>
+               <dd className={board.stale === "0" ? "good" : "bad"}>{board.stale}</dd>
+               <dfn>target 0, from 48 a quarter</dfn></div>
+          <div><dt>Cost per ticket</dt>
+               <dd className="good">{board.cost}</dd>
+               <dfn>cap $4.50, from $6.16</dfn></div>
+          <div><dt>Answered without a person</dt>
+               <dd>{board.alone}</dd>
+               <dfn>the rest route with a reason</dfn></div>
+        </dl>
+      )}
+
       <div className="split">
         <nav className="list">
+          <p className="rail">Queue · {rows.length}</p>
           {rows.map((r) => {
             const s = r.result ? status(r.result) : null;
             return (
@@ -117,11 +136,10 @@ export default function Console() {
               </button>
             );
           })}
-          {done.length > 0 && (
-            <p className="tally">
-              {done.length} drafted · {(spend / done.length).toFixed(6)} USD each
-            </p>
-          )}
+          <p className="tally">
+            Sample tickets. The PF wage ceiling changed on 1 Aug 2026, so the
+            first two ask the same thing on either side of it.
+          </p>
         </nav>
 
         <section className="work">
@@ -131,8 +149,8 @@ export default function Console() {
             <div className="qfoot">
               <span>{cur.customer}</span>
               <span className="sep">·</span>
-              <label>
-                for the period
+              <label className="asof">
+                answer for the payroll period of
                 <input type="date" value={cur.asOf}
                   onChange={(e) => patch(cur.key, { asOf: e.target.value,
                                                     state: "idle", result: undefined,
@@ -172,6 +190,7 @@ function Reply({ row, acted, onAct, onCompare }: {
   const sources = r.sources || [];
   const parts = withMarkers(r.draft || "");
   const pii = Object.entries(r.pii_counts || {});
+  const bad = stale(r, row.asOf);
 
   return (
     <article className="reply">
@@ -191,6 +210,13 @@ function Reply({ row, acted, onAct, onCompare }: {
         </div>
       ) : (
         <p className="nodraft">Nothing was sent to the customer.</p>
+      )}
+
+      {bad.length > 0 && (
+        <p className="staleline">
+          {bad.length === 1 ? "A cited rule was" : `${bad.length} cited rules were`} not
+          in force on this date: {bad.map((b) => b.source_id).join(", ")}.
+        </p>
       )}
 
       {pii.length > 0 && (
@@ -216,8 +242,8 @@ function Reply({ row, acted, onAct, onCompare }: {
               {s.tone === "ok" ? "Send to a person instead" : "Take it"}
             </button>
             {row.dated && !row.compare && (
-              <button className="link" onClick={() => onCompare(otherPeriod(row.asOf))}>
-                Check another period
+              <button className="ghost" onClick={() => onCompare(otherPeriod(row.asOf))}>
+                Compare with {pretty(otherPeriod(row.asOf))}
               </button>
             )}
           </>

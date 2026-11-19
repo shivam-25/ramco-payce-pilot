@@ -140,3 +140,37 @@ export async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>
     while (queue.length) await fn(queue.shift() as T);
   }));
 }
+
+
+/** Did every passage this reply cites actually apply on the date asked about?
+ *  The console checks this itself rather than trusting the answer: the window
+ *  comes back with each source, so a stale citation is visible here even if
+ *  nothing upstream caught it. This is the brief's headline number -- stale
+ *  citations after the effective date, 48 a quarter today, target zero. */
+export function stale(r: Result, asOf: string): Source[] {
+  return (r.sources || []).filter((s) => {
+    if (s.effective_from && asOf < s.effective_from) return true;
+    if (s.effective_to && asOf >= s.effective_to) return true;
+    return false;
+  });
+}
+
+export type Score = { cited: string; stale: string; cost: string; alone: string };
+
+/** The four day-one numbers from the brief, computed from what is on screen. */
+export function score(rows: Row[]): Score | null {
+  const done = rows.filter((r) => r.state === "done" && r.result);
+  if (!done.length) return null;
+  const answered = done.filter((r) => r.result!.draft);
+  const withCite = answered.filter((r) => (r.result!.citations || []).length);
+  const staleN = done.filter((r) => stale(r.result!, r.asOf).length).length;
+  const spend = done.reduce((a, r) => a + (r.result!.usd || 0), 0) / done.length;
+  const alone = done.filter((r) => r.result!.route !== "human"
+                                && !r.result!.needs_approval).length;
+  return {
+    cited: answered.length ? `${Math.round(100 * withCite.length / answered.length)}%` : "—",
+    stale: String(staleN),
+    cost: `$${spend.toFixed(5)}`,
+    alone: `${Math.round(100 * alone / done.length)}%`,
+  };
+}
