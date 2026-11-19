@@ -1,0 +1,14 @@
+# Vercel builds from web/. Nothing else in this repository belongs on a
+# third-party host, and the data room must never leave the machine.
+data/
+dist/
+.venv/
+evals/
+scripts/
+src/
+infra/
+docs/
+.github/
+*.pptx
+*.jpg
+*.png

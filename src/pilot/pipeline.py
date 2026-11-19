@@ -15,6 +15,7 @@ from .bedrock import Meter
 from .classify import classify
 from .cache import lookup as cache_lookup, store as cache_store
 from .db import connect
+from .dedupe import case_id_for, record_and_count, INCIDENT_AT
 from .injection import screen
 from .lookup import customers, customer_names, enrich, sla, in_payroll_week
 from .normalise import normalise
@@ -37,8 +38,17 @@ class Result:
     tier: str | None = None
     priority: str | None = None
     case_id: str | None = None
+    case_size: int = 0
+    incident: bool = False
     draft: str = ""
     citations: list = field(default_factory=list)
+    # The cited passages themselves. The brief's target is 100% of replies
+    # carrying a *verifiable* citation, and a source id alone is not
+    # verifiable — the reader cannot see what it said or, which caused the
+    # incident this pilot exists to prevent, when it was true. Each entry
+    # carries the window it was in force so the reader can check the answer
+    # against the date they asked about.
+    sources: list = field(default_factory=list)
     needs_approval: bool = False
     output_check: dict = field(default_factory=dict)
     pii_counts: dict = field(default_factory=dict)
@@ -132,6 +142,25 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
 
     # ---- cache, then answer, then output check -------------------------
     with connect(ticket.region) as conn:
+        # ---- box 5: dedupe ---------------------------------------------
+        # This box is named in the architecture and was missing from the
+        # live path: case_id was declared on the Result and never set, so
+        # the deployed pilot had no dedupe and no incident signal, while
+        # the batch gate G3 measured a dedupe that production never ran.
+        #
+        # It sits here rather than before the router because that is where
+        # a connection exists. Routing does not yet consult case continuity
+        # — a ticket joining an open case should follow it to whoever owns
+        # it, and that is the next step, not something this does today.
+        t0 = clock()
+        res.case_id = case_id_for(ticket, queue=queue)
+        res.case_size = record_and_count(conn, res.case_id, ticket.ticket_id)
+        res.incident = res.case_size >= INCIDENT_AT
+        t["dedupe"] = (clock() - t0) * 1000
+        if res.incident:
+            _audit(conn, ticket.ticket_id, "incident_declared",
+                   {"case_id": res.case_id, "tickets": res.case_size})
+
         _audit(conn, ticket.ticket_id, "pii_gate",
                {"counts": red.counts, "leaks": 0})
         _audit(conn, ticket.ticket_id, "router",
@@ -147,6 +176,7 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
                 res.route = Route.CACHE.value
                 res.draft = hit.answer
                 res.citations = hit.citations
+                res.sources = hit.sources or []
                 res.reason = f"semantic cache hit at {hit.similarity:.3f}"
                 res.timings_ms = {k: round(v, 1) for k, v in t.items()}
                 res.usd = meter.usd
@@ -190,6 +220,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
         else:
             res.draft = d.text
             res.citations = d.citations
+            from .cache import passage_sources
+            res.sources = passage_sources(d.passages, d.citations)
             if use_cache:
                 cache_store(conn, text, ticket.region, d.text,
                             d.citations, as_of, passages=d.passages)

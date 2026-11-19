@@ -96,3 +96,66 @@ def summarise(tickets: list, cases: dict[str, str]) -> dict:
         "tickets_in_clusters": merged,
         "reduction": 1 - len(sizes) / len(tickets) if tickets else 0.0,
     }
+
+
+# --------------------------------------------------- live, one ticket
+INCIDENT_AT = 5          # the brief: "5th identical report -> incident"
+
+
+def _today():
+    from datetime import date as _date
+    return _date.today()
+
+
+def case_id_for(ticket, queue: str | None = None) -> str:
+    """The same case id assign_cases would give this ticket, computed one
+    ticket at a time. Live triage sees one ticket, not a batch, so the batch
+    function cannot be used — but the two must agree, so the id is built
+    here from the identical parts in the identical order.
+
+    `queue` is the category the classifier decided. The batch path reads the
+    category the customer picked, because historical tickets carry one; a
+    live ticket from email or chat often does not, and keying on a missing
+    field gives every ticket its own case, which silently disables the
+    incident rule. What the classifier determined is also the better key:
+    it is what the batch category is a noisy proxy for.
+    """
+    cid = ticket.customer_id
+    cat = canonical_category(ticket.raw_category) or queue
+    # A historical ticket carries its arrival time. A live one may not —
+    # normalise only parses the export's timestamp formats — and a ticket
+    # being triaged right now belongs to today's case either way. Falling
+    # back to the batch rule here (no timestamp, so its own case) would mean
+    # every live ticket is a singleton and the incident rule never fires,
+    # which is how a feature ends up shipped and dead.
+    day = ticket.received_at.date() if ticket.received_at else _today()
+    if not (cid and cat):
+        return f"CASE-{ticket.ticket_id}"
+    return f"CASE-{cid}-{cat.replace(' ', '')[:8]}-{day:%Y%m%d}"
+
+
+def record_and_count(conn, case_id: str, ticket_id: str) -> int:
+    """Add this ticket to its case and return how many tickets the case now
+    holds. This is what makes the incident rule automatic: the brief's
+    target is 30 minutes from the fifth identical report to a declared
+    incident, and the only way to beat that reliably is to count on arrival
+    rather than wait for someone to notice a pattern.
+
+    Failing to count must never fail a ticket, so a broken table costs the
+    incident signal and nothing else.
+    """
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS case_members ("
+            " case_id text NOT NULL,"
+            " ticket_id text NOT NULL,"
+            " seen_at timestamptz NOT NULL DEFAULT now(),"
+            " PRIMARY KEY (case_id, ticket_id))")
+        conn.execute("INSERT INTO case_members (case_id, ticket_id) "
+                     "VALUES (%s,%s) ON CONFLICT DO NOTHING",
+                     (case_id, ticket_id))
+        row = conn.execute("SELECT count(*) AS n FROM case_members "
+                           "WHERE case_id = %s", (case_id,)).fetchone()
+        return int(row["n"] if isinstance(row, dict) else row[0])
+    except Exception:
+        return 0

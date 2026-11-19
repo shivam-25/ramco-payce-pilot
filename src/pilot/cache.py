@@ -21,7 +21,7 @@ stale answer, and stale answers are what this pilot was built to stop.
 """
 from __future__ import annotations
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from .bedrock import embed, Usage
@@ -36,6 +36,11 @@ class CacheHit:
     as_of: date | None
     valid_from: date | None = None
     valid_to: date | None = None
+    # The cited passages, carried through the cache. Without these a cached
+    # reply shows citation markers that open onto nothing, and the brief
+    # asks for 100% of replies to carry a *verifiable* citation. A marker
+    # the reader cannot check is not one.
+    sources: list = field(default_factory=list)
 
 
 def window_for(passages) -> tuple[date | None, date | None]:
@@ -50,17 +55,47 @@ def window_for(passages) -> tuple[date | None, date | None]:
     return (max(starts) if starts else None, min(ends) if ends else None)
 
 
+def passage_sources(passages, citations) -> list:
+    """The cited passages, in the shape the console renders. Built in one
+    place so a fresh answer and a cached one are inspected identically."""
+    cited = set(citations or [])
+    return [{"source_id": h.source_id,
+             "heading": getattr(h, "heading", None),
+             "effective_from": str(h.effective_from) if getattr(h, "effective_from", None) else None,
+             "effective_to": str(h.effective_to) if getattr(h, "effective_to", None) else None,
+             "snippet": (getattr(h, "text", "") or "")[:400],
+             "sim": round(getattr(h, "sim", 0.0), 3)}
+            for h in passages if h.source_id in cited]
+
+
+def _ensure_sources_column(conn) -> None:
+    """Older rows predate this column. Adding it is cheap and idempotent,
+    and failing to add it must cost the citation detail, not the answer."""
+    try:
+        conn.execute("ALTER TABLE answer_cache ADD COLUMN IF NOT EXISTS sources jsonb")
+    except Exception:
+        pass
+
+
 def lookup(conn, question: str, region: str, as_of: date | None = None,
            threshold: float = CACHE_THRESHOLD) -> tuple[CacheHit | None, Usage]:
     vector, usage = embed(question)
+    _ensure_sources_column(conn)
     row = conn.execute(
         """
-        SELECT cache_id, answer, citations, as_of, valid_from, valid_to,
+        SELECT cache_id, answer, citations, sources, as_of, valid_from, valid_to,
                1 - (embedding <=> %s::vector) AS similarity
           FROM answer_cache
          WHERE region = %s
            -- The window is checked in SQL, not after the fact, so a stale
            -- entry is never even the nearest neighbour.
+           -- An entry written before passages were recorded cannot show
+           -- what it cited, and a citation the reader cannot open is not a
+           -- verifiable one. Skipping those entries costs one re-draft
+           -- each, after which the entry is stored with its sources and the
+           -- cache has healed itself. The alternative is serving markers
+           -- that open onto nothing, forever.
+           AND sources IS NOT NULL
            AND (%s::date IS NULL
                 OR ((valid_from IS NULL OR valid_from <= %s::date)
                 AND (valid_to   IS NULL OR valid_to   >  %s::date)))
@@ -73,7 +108,8 @@ def lookup(conn, question: str, region: str, as_of: date | None = None,
                  (row["cache_id"],))
     return CacheHit(row["answer"], row["citations"],
                     float(row["similarity"]), row["as_of"],
-                    row["valid_from"], row["valid_to"]), usage
+                    row["valid_from"], row["valid_to"],
+                    row.get("sources") or []), usage
 
 
 def store(conn, question: str, region: str, answer: str,
@@ -82,9 +118,11 @@ def store(conn, question: str, region: str, answer: str,
     served instantly and forever, which is worse than a slow right one."""
     vector, _ = embed(question)
     valid_from, valid_to = window_for(passages)
+    _ensure_sources_column(conn)
     conn.execute(
         "INSERT INTO answer_cache (region, question, embedding, answer, "
-        "citations, as_of, valid_from, valid_to) "
-        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+        "citations, sources, as_of, valid_from, valid_to) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (region, question, vector, answer, json.dumps(citations),
+         json.dumps(passage_sources(passages, citations)),
          as_of, valid_from, valid_to))
