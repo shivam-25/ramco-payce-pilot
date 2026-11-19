@@ -21,7 +21,11 @@ out() { aws cloudformation describe-stacks --stack-name "$STACK" \
           --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
 
 SG=$(out RuntimeSecurityGroup)
-SUBNETS=$(out SubnetList)
+# The private subnets, not the default VPC's public ones. In VPC mode the
+# runtime's network interfaces need a default route to the NAT gateway; a
+# public subnet's interfaces get no public IP and therefore no egress at all,
+# which is how the first deploy came up READY and then 400'd every call.
+SUBNETS=$(out RuntimeSubnetList)
 EP_IN=$(out EndpointIN)
 EP_UAE=$(out EndpointUAE)
 echo "sg=$SG subnets=$SUBNETS"

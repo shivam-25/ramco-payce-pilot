@@ -4,8 +4,9 @@ This runs in code AFTER the model, on the draft the model actually produced.
 It is not an instruction in the prompt, because a prompt is followed most of
 the time and the fraction that is not is the incident.
 
-Six checks, each tracing to something that actually went wrong in the vendor
-pilot or is named in the brief:
+Seven checks, each tracing to something that actually went wrong in the
+vendor pilot, is named in the brief, or was found by running this pipeline
+against the real export:
 
   C1 citation      every factual claim cites a passage
   C2 money         no monetary amount that is not in a cited passage
@@ -15,6 +16,7 @@ pilot or is named in the brief:
   C6 fabrication   no claim to quote a KB article body (we do not have them)
 """
 from __future__ import annotations
+import re
 import re
 from dataclasses import dataclass, field
 
@@ -44,11 +46,46 @@ def _numbers_in(text: str) -> set[str]:
     return {re.sub(r"[,\s]", "", m) for m in re.findall(r"[\d][\d,\.]*", text)}
 
 
+# Phrases that mean "the answer is somewhere else". They are honest — the
+# model is refusing to invent a number it was never given — but they are not
+# an answer, and a customer who gets one has been charged a round trip for
+# nothing.
+_POINTER_ONLY = re.compile(
+    r"\b(refer to|see|consult|available in|documented in|found in|"
+    r"please check|more details in)\b[^.]{0,60}"
+    r"\b(confluence|kb[- ]?\d+|article|knowledge base|full (article|document))\b",
+    re.I)
+
+
+def _all_passages_are_stubs(draft) -> bool:
+    from .chunking import STUB_MARKER
+    passages = getattr(draft, "passages", None) or []
+    if not passages:
+        return False
+    return all(STUB_MARKER in (p.text or "") for p in passages)
+
+
 def check(draft, *, tier: str | None = None, priority: str = "P3",
           payroll_week: bool = False) -> CheckResult:
     fails: list[str] = []
     detail: dict = {}
     text = draft.text or ""
+
+    # ---- C7 -------------------------------------------------------------
+    # Every passage behind this answer is a metadata stub, so there was never
+    # any content to answer from. The model behaved well: it declined to
+    # invent an ESI rate and pointed at the article instead. But "the rate is
+    # in KB-0140, please read it" satisfies the citation check while telling
+    # the customer nothing, and it is strictly worse than handing the ticket
+    # to someone who can open Confluence. So it goes to a person.
+    if not draft.escalate and _all_passages_are_stubs(draft):
+        fails.append("C7_pointer_only")
+        detail["C7_pointer_only"] = (
+            "every retrieved passage is a KB index entry with no body; "
+            "a pointer is not an answer")
+    elif not draft.escalate and _POINTER_ONLY.search(text) and len(text) < 260:
+        fails.append("C7_pointer_only")
+        detail["C7_pointer_only"] = "the reply only says where the answer lives"
 
     if draft.escalate:
         # An escalation is a valid, safe output. Only the leak check applies.

@@ -39,9 +39,21 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("sys_spoof",  re.compile(r"\b(SYSTEM|ASSISTANT|DEVELOPER|USER)\s*:\s*\S")),
     ("sys_spoof",  re.compile(r"<\s*/?\s*(system|assistant|instruction|ticket)\s*>", re.I)),
     ("comment",    re.compile(r"<!--[^>]*\b(assistant|ai|ignore|system|policy)\b", re.I)),
-    ("exfil",      re.compile(r"\b(reveal|disclose|print|output|repeat|show)\b"
-                              r"[^.]{0,40}\b(system prompt|instructions|connection "
-                              r"string|credentials|api key|all customer|every customer)\b", re.I)),
+    # "reply with ..." and "send me ..." are how the real tickets phrased it;
+    # the first version only looked for reveal/disclose/print/show and let
+    # the commonest wording straight through.
+    #
+    # The trailing `s?` is not cosmetic. Without it "output your full
+    # instructions" slipped past, because \binstruction\b cannot match the
+    # plural — a word-boundary assertion that reads as thorough and quietly
+    # halves the pattern's reach.
+    ("exfil",      re.compile(r"\b(reveal|disclose|print|output|repeat|show|"
+                              r"reply with|send me|send us|give me|list all|"
+                              r"list of all|email me|forward me)\b"
+                              r"[^.\n]{0,40}\b(all|every|each|list|"
+                              r"prompt|instruction|system|credential|password|"
+                              r"api[_ -]?key|token|secret|customer|admin|"
+                              r"email|address|database|table)s?\b", re.I)),
     ("tool_call",  re.compile(r"\b(run|execute|call|invoke)\b[^.]{0,25}"
                               r"\b(tool|function|command|query)\b", re.I)),
     ("tool_call",  re.compile(r"\b[a-z_]{3,30}\s*\(\s*[^)]{0,40}\)\s*$", re.M)),

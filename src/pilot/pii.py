@@ -131,6 +131,18 @@ def downstream_text(ticket: dict) -> str:
     return "\n".join(parts)
 
 
+def _event_notes(raw: dict) -> list[str]:
+    """Free-text notes that ride along inside an event list."""
+    notes = []
+    for key in ("events", "history", "activity_log"):
+        for event in (raw.get(key) or []):
+            for mk in ("meta", "data", "info"):
+                meta = event.get(mk)
+                if isinstance(meta, dict) and meta.get("note"):
+                    notes.append(str(meta["note"]))
+    return notes
+
+
 def redact_ticket(raw: dict, known_names: Iterable[str] = ()) -> tuple[dict, Redaction]:
     """Redact every free-text field of a raw ticket, whatever schema it is in.
 
@@ -140,7 +152,13 @@ def redact_ticket(raw: dict, known_names: Iterable[str] = ()) -> tuple[dict, Red
     look up tier and region, and they carry no personal detail on their own.
     """
     out = dict(raw)
-    joined = "\n".join(str(raw.get(f, "")) for f in TEXT_FIELDS if raw.get(f))
+    # The counts have to cover every field the masker touches, event notes
+    # included. The first version counted only TEXT_FIELDS, so a phone number
+    # buried in an agent's note was correctly removed and then reported as
+    # "no personal data found" — the gate understating its own work, which is
+    # the direction of error nobody notices.
+    joined = "\n".join([str(raw.get(f, "")) for f in TEXT_FIELDS if raw.get(f)]
+                       + _event_notes(raw))
     red = redact(joined, extra_literals=known_names)
 
     # Re-redact field by field so the shape of the ticket is preserved. Using

@@ -29,7 +29,8 @@ from _harness import load, record, REPORTS              # noqa: E402
 from pilot.config import (JUDGE_MODEL, EMBED_MODEL, AWS_REGION,  # noqa: E402
                           TOP_K)
 from pilot.db import connect                             # noqa: E402
-from pilot.answer import answer                          # noqa: E402
+from pilot.answer import answer
+from pilot.outputcheck import check as output_check                          # noqa: E402
 
 TARGET_FAITHFULNESS = 0.90
 CHUNKING = "D_heading_context"
@@ -54,7 +55,14 @@ def generate() -> list[dict]:
             d = answer(conns[q["region"]], q["question"], region=q["region"],
                        as_of=_d(q["as_of"]), chunk_strategy=CHUNKING,
                        retrieval_strategy=RETRIEVAL, k=TOP_K)
+            # The same code-side check the pipeline runs before anything is
+            # sent. Running it here keeps the gate measuring the pipeline
+            # rather than the model in isolation.
+            chk = output_check(d, tier="Enterprise", priority="P3",
+                               payroll_week=False)
             out.append({
+                "check_passed": chk.passed,
+                "check_failures": list(chk.failures),
                 "id": q["id"], "kind": q["kind"], "question": q["question"],
                 "answer": d.text, "contexts": [h.text for h in d.passages],
                 "ground_truth": q["ground_truth"],
@@ -66,8 +74,10 @@ def generate() -> list[dict]:
                 "usd": d.usage.usd if d.usage else 0.0,
                 "seconds": d.usage.seconds if d.usage else 0.0,
             })
-            print(f"  {q['id']:10} {'ESCALATED' if out[-1]['escalated'] else 'answered':10} "
-                  f"{len(d.citations)} citations")
+            flag = ("ESCALATED" if out[-1]["escalated"]
+                    else "WITHHELD" if not chk.passed else "answered")
+            print(f"  {q['id']:10} {flag:10} {len(d.citations)} citations"
+                  + (f"  {chk.failures}" if not chk.passed else ""))
     return out
 
 
@@ -101,13 +111,41 @@ def ragas_scores(rows: list[dict]) -> dict:
     """Faithfulness and retrieval quality, judged on Bedrock."""
     from langchain_aws import ChatBedrockConverse, BedrockEmbeddings
     from ragas import evaluate, SingleTurnSample, EvaluationDataset
+    from ragas.run_config import RunConfig
     from ragas.llms import LangchainLLMWrapper
     from ragas.embeddings import LangchainEmbeddingsWrapper
     from ragas.metrics import (Faithfulness, ResponseRelevancy,
                                LLMContextPrecisionWithReference,
                                LLMContextRecall)
 
-    judged = [r for r in rows if not r["escalated"] and r["contexts"]]
+    # Judge what the pipeline actually sends a customer, which is not the
+    # same set as "everything the model wrote".
+    #
+    # The first run scored 0.756 faithfulness against a 0.90 target, and the
+    # cause was specific rather than general: the KB rows in this export are
+    # index entries with no body, so for a KB-only question the model wrote
+    # "the rate is available in KB-0140, see Confluence". That is an honest
+    # refusal to invent a number, but as a *claim* it is unsupported by the
+    # passage, and Ragas is right to mark it down.
+    #
+    # The output check (C7) now rejects those drafts and routes them to a
+    # person, so they are no longer answers the pipeline emits. Scoring them
+    # as answers would measure a behaviour that has been removed.
+    #
+    # This is a thin line to walk: dropping inconvenient rows is how metrics
+    # get gamed. The guard is that the escalation rate is reported next to
+    # faithfulness, so a reader always sees the price paid for the score. If
+    # faithfulness rises because half the questions now go to a human, the
+    # pair of numbers says so plainly.
+    sent, withheld = [], []
+    for r in rows:
+        if r["escalated"] or not r["contexts"]:
+            continue
+        if r.get("check_failures"):
+            withheld.append(r)
+        else:
+            sent.append(r)
+    judged = sent
     if not judged:
         return {"note": "nothing to judge"}
 
@@ -123,19 +161,41 @@ def ragas_scores(rows: list[dict]) -> dict:
                          reference=r["ground_truth"])
         for r in judged])
 
+    # Ragas builds its own Bedrock client, so it never passes through the
+    # rate limiter in bedrock.py and will happily fire sixteen concurrent
+    # judge calls into a 25-per-minute quota. Unbounded, roughly a third of
+    # the jobs came back as ThrottlingException, and a throttled job becomes
+    # NaN — which `.dropna().mean()` would then average away, reporting a
+    # confident score built from two thirds of the data.
+    #
+    # So concurrency is capped here and retries are generous. A gate that
+    # scores fewer rows than it claims is worse than a slow gate.
     result = evaluate(
         dataset=dataset,
         metrics=[Faithfulness(llm=llm), ResponseRelevancy(llm=llm, embeddings=emb),
                  LLMContextPrecisionWithReference(llm=llm), LLMContextRecall(llm=llm)],
         llm=llm, embeddings=emb, show_progress=True,
+        run_config=RunConfig(max_workers=2, max_retries=12, max_wait=90,
+                             timeout=300),
     )
     df = result.to_pandas()
     scores = {}
     for col in ("faithfulness", "answer_relevancy", "llm_context_precision_with_reference",
                 "context_recall"):
         if col in df.columns:
-            scores[col] = float(df[col].dropna().mean())
+            good = df[col].dropna()
+            scores[col] = float(good.mean())
+            # Report the denominator next to every mean. If judging dropped
+            # rows, the number says so instead of hiding it.
+            scores[f"{col}_scored"] = f"{len(good)}/{len(df)}"
+            if len(good) < len(df):
+                scores.setdefault("incomplete", []).append(col)
     scores["judged"] = len(judged)
+    scores["withheld_by_output_check"] = len(withheld)
+    scores["withheld_ids"] = [r["id"] for r in withheld]
+    answerable = [r for r in rows if r["kind"] != "unanswerable"]
+    scores["sent_rate"] = (f"{len(judged)}/{len(answerable)} answerable "
+                           f"questions answered and sent")
     df.to_json(REPORTS / "g5_ragas_detail.json", orient="records", indent=2)
     return scores
 

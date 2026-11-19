@@ -26,6 +26,12 @@ from .config import DATA_ROOM
 PROCESS_DOCS = ("escalation_policy.md", "payroll_week_runbook.md",
                 "sla_contract_excerpt.md", "ticket_triage_sop.md")
 
+# A KB row in this export is an index entry: title, topic, owner, review
+# date — and no body, because the body lives in Confluence. The marker is a
+# named constant so the output check can recognise a passage that cannot
+# support an answer, rather than matching on prose that might be reworded.
+STUB_MARKER = "[KB index entry — body lives in Confluence]"
+
 STRATEGIES = ("A_whole_doc", "B_fixed_512", "C_heading", "D_heading_context")
 
 # Sentinel start for a "period before the first recorded change". The corpus
@@ -188,7 +194,7 @@ def build(strategy: str, rules: list[dict], kb: list[dict]) -> list[Chunk]:
                 f"status {a.get('status')}.{stale} "
                 f"Body not available in this system: {a.get('excerpt')}")
         if strategy == "D_heading_context":
-            text = f"[KB index entry — body lives in Confluence]\n{text}"
+            text = f"{STUB_MARKER}\n{text}"
         chunks.append(Chunk(strategy, "kb", a["id"], a.get("topic"), text,
                             region=a.get("region", "ALL")))
 

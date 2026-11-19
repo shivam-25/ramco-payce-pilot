@@ -29,7 +29,13 @@ MONEY_SIGNALS = re.compile(
     r"\b(refund|chargeback|credit note|invoice|billing|overcharg|"
     r"double charg|not credited|not received|salary not|unpaid|"
     r"underpaid|overpaid|reimburse|wrong amount|short paid|arrears|"
-    r"payment failed|bounced)\b", re.I)
+    r"payment failed|bounced|"
+    # A service credit is money leaving the company, and the SLA contract
+    # prices it as a percentage of the monthly fee. The first version of this
+    # list missed it, so "we are claiming the service credit" was eligible to
+    # be answered by a model. It is not.
+    r"service credit|sla credit|penalty|compensat|waiver|waive the fee|"
+    r"claiming the credit|claim the credit)\b", re.I)
 
 
 class Route(str, Enum):

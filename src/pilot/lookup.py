@@ -17,7 +17,7 @@ import csv
 from dataclasses import dataclass
 from functools import lru_cache
 
-from .config import DATA_ROOM
+from .config import DATA_ROOM, REGIONS
 
 # From process/sla_contract_excerpt.md section 3.1. First-response and
 # resolution clocks in ELAPSED hours from ticket creation, by tier and
@@ -66,8 +66,7 @@ class Customer:
     employees_paid: int
 
 
-@lru_cache(maxsize=1)
-def customers() -> dict[str, Customer]:
+def _from_csv() -> dict[str, Customer]:
     path = DATA_ROOM / "data" / "customers.csv"
     out: dict[str, Customer] = {}
     with path.open() as fh:
@@ -79,6 +78,55 @@ def customers() -> dict[str, Customer]:
                 employees_paid=int(row["employees_paid"]),
             )
     return out
+
+
+def _from_db() -> dict[str, Customer]:
+    """The contract table, read from both regional databases and unioned.
+
+    A customer id exists in exactly one region's database, so the union is a
+    lookup table and not a merge. The names are also handed to the PII gate
+    as literals; a name from the other region appearing in that list can only
+    ever cause more masking, never less, so the union is safe in the
+    direction that matters.
+    """
+    from .db import connect                       # local: avoids a cycle
+    out: dict[str, Customer] = {}
+    for region in REGIONS:
+        with connect(region) as conn:
+            for r in conn.execute(
+                    "SELECT customer_id, name, tier, region, "
+                    "monthly_fee_usd, employees_paid FROM customers").fetchall():
+                out[r["customer_id"]] = Customer(
+                    customer_id=r["customer_id"], name=r["name"],
+                    tier=r["tier"], region=r["region"],
+                    monthly_fee_usd=float(r["monthly_fee_usd"] or 0),
+                    employees_paid=int(r["employees_paid"] or 0),
+                )
+    return out
+
+
+@lru_cache(maxsize=1)
+def customers() -> dict[str, Customer]:
+    """Database first, CSV second.
+
+    The deployed runtime has no data room: the packaging step deliberately
+    leaves customer records out of the deployment artifact, because a zip
+    file in S3 is not where contract data belongs. The first VPC deploy
+    therefore answered /ping happily and failed every real ticket with
+    FileNotFoundError on customers.csv — the runtime was reading from a
+    directory that only exists on a developer's machine.
+    
+    The CSV path is kept for local work and for the gates, which run against
+    the same data before it is loaded. Whichever source answers, the shape is
+    identical, so nothing downstream knows or cares which one it got.
+    """
+    try:
+        db = _from_db()
+        if db:
+            return db
+    except Exception:
+        pass
+    return _from_csv()
 
 
 @lru_cache(maxsize=1)

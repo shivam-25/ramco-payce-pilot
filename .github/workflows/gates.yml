@@ -1,0 +1,59 @@
+name: gates
+
+# The gates that need nothing but the code run on every push. The gates that
+# need the databases and Bedrock run on a schedule and on demand, because a
+# pull request should not be able to spend money or reach production data.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  code-gates:
+    name: PII, injection and money routing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'          # the version AgentCore runs
+
+      - name: install
+        run: python -m pip install -q promptfoo-python || true
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: the three properties that must never regress
+        working-directory: evals/promptfoo
+        run: npx --yes promptfoo@0.118.11 eval -c promptfooconfig.yaml --no-cache
+
+      - name: import check on every module
+        run: |
+          python - <<'PY'
+          import pathlib, importlib, sys
+          sys.path.insert(0, "src")
+          bad = []
+          for f in sorted(pathlib.Path("src/pilot").glob("*.py")):
+              if f.stem == "__init__":
+                  continue
+              try:
+                  importlib.import_module(f"pilot.{f.stem}")
+              except Exception as e:
+                  bad.append(f"{f.stem}: {type(e).__name__}: {e}")
+          if bad:
+              print("\n".join(bad)); raise SystemExit(1)
+          print("all modules import cleanly")
+          PY
+
+      - name: nothing resembling case data is tracked
+        run: |
+          if git ls-files | grep -Ei 'data-room|tickets_export|\.jsonl$|\.csv$'; then
+            echo "case data is tracked — see .gitignore"; exit 1
+          fi
+          if git grep -nEi 'aadhaar [0-9]{4} ?[0-9]{4}|AE00 ?[0-9]{4} ?[0-9]{4}' -- . ; then
+            echo "a real identifier is committed"; exit 1
+          fi
+          echo "clean"

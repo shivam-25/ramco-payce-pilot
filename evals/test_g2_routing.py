@@ -8,6 +8,9 @@ The classifier sees only masked subject + body. It never sees the category
 label, the queue or the event history.
 """
 from __future__ import annotations
+import math
+import os
+import random
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -19,18 +22,64 @@ from pilot.classify import classify                   # noqa: E402
 
 TARGET = 0.95
 
+# Bedrock gives this account 20 classify calls a minute, so the full 1,341
+# tickets take about 85 minutes of wall clock and three restarts' worth of
+# throttling to get through. A stratified sample measures the same quantity
+# with a stated margin of error, and the margin is reported next to the
+# number so nobody mistakes a sample for a census.
+#
+# Set G2_SAMPLE=0 to run every ticket.
+SAMPLE = int(os.environ.get("G2_SAMPLE", "400"))
+SEED = 20261119
+
+
+def _stratified(rows: list[dict], n: int) -> list[dict]:
+    """Sample proportionally within each gold queue, so a small queue is not
+    lost to chance and per-queue recall stays meaningful."""
+    by_q: dict[str, list[dict]] = {}
+    for r in rows:
+        by_q.setdefault(r["gold_queue"], []).append(r)
+    rng = random.Random(SEED)
+    picked: list[dict] = []
+    for q, group in sorted(by_q.items()):
+        rng.shuffle(group)
+        take = max(8, round(n * len(group) / len(rows)))
+        picked.extend(group[:min(take, len(group))])
+    return picked
+
+
+def _wilson(hits: int, n: int) -> tuple[float, float]:
+    """95% Wilson interval. Preferred over the normal approximation because
+    the proportion here sits near 1, where the normal interval runs past it."""
+    if n == 0:
+        return 0.0, 0.0
+    z, p = 1.96, hits / n
+    d = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / d
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return max(0.0, centre - half), min(1.0, centre + half)
+
 
 def run() -> dict:
     rows = load("g2_routing.jsonl")
+    total = len(rows)
+    if SAMPLE and SAMPLE < total:
+        rows = _stratified(rows, SAMPLE)
+        print(f"  stratified sample: {len(rows)} of {total} tickets "
+              f"(seed {SEED})")
 
     def one(r):
         cat, queue, usage = classify(r["text"])
         return {**r, "pred_queue": queue, "usage": usage}
 
-    out = parallel(one, rows)
+    # Two workers, not six. The limiter paces the mean rate correctly, but
+    # six threads waking together still arrive as a burst and Bedrock
+    # measures bursts. Throughput is set by the quota either way.
+    out = parallel(one, rows, workers=2, label="g2")
 
     hits = sum(r["pred_queue"] == r["gold_queue"] for r in out)
     acc = hits / len(out)
+    lo, hi = _wilson(hits, len(out))
 
     # Per-queue recall. A mean of 95% that hides a queue at 40% is not a pass
     # anyone should accept, so the worst queue is reported next to the mean.
@@ -51,7 +100,9 @@ def run() -> dict:
     secs.sort()
 
     return {
-        "n": len(out), "accuracy": acc, "baseline": baseline,
+        "n": len(out), "sampled_from": total,
+        "accuracy": acc, "accuracy_ci95": [round(lo, 4), round(hi, 4)],
+        "baseline": baseline,
         "per_queue": per_q, "worst": worst,
         "misrouted_total": len(mis), "misrouted_fixed": mis_fixed,
         "usd": usd, "p95_s": secs[int(len(secs) * 0.95)],
@@ -62,7 +113,10 @@ def test_g2_routing_accuracy():
     m = run()
     print(f"\n  tickets            {m['n']}")
     print(f"  intake baseline    {m['baseline']*100:.1f}%")
-    print(f"  pilot accuracy     {m['accuracy']*100:.1f}%")
+    lo, hi = m["accuracy_ci95"]
+    print(f"  pilot accuracy     {m['accuracy']*100:.1f}%  "
+          f"(95% CI {lo*100:.1f}–{hi*100:.1f}%, n={m['n']} "
+          f"of {m['sampled_from']})")
     print(f"  misroutes fixed    {m['misrouted_fixed']}/{m['misrouted_total']}")
     print(f"  worst queue        {m['worst'][0]} "
           f"{m['worst'][1][0]*100:.1f}% (n={m['worst'][1][1]})")

@@ -64,46 +64,85 @@ Resources:
       Tags: [{ Key: Project, Value: ramco-payce-pilot }, { Key: DataRegion, Value: UAE }]
 
   # ---- private egress ---------------------------------------------------
-  # The runtime sits in the VPC so it can reach a private database. It still
-  # needs Bedrock, Secrets Manager and S3. Interface endpoints give it those
-  # without a NAT gateway and without putting anything on the public
-  # internet: roughly USD 15 a month for the two interface endpoints, versus
-  # about USD 32 for a NAT gateway, and the S3 gateway endpoint is free.
-  # This is a real line in the pilot's run cost and is carried into the cost
-  # sheet rather than quietly omitted.
+  # The runtime runs in VPC mode so it can reach databases that are not
+  # publicly accessible. In VPC mode the container has no internet route of
+  # its own, and it needs one before it can even start: AgentCore pulls the
+  # image from ECR and ships logs to CloudWatch before any of this code runs.
+  # That is why the first VPC-mode deploy came up READY and then failed every
+  # invocation with a 400 and not one line of log output.
+  #
+  # Two ways to give it that reachability, both measured rather than assumed:
+  #
+  #   Interface endpoints, one per service. AWS's own VPC sample for
+  #   AgentCore uses thirteen (ECR api and dkr, CloudWatch Logs and
+  #   Monitoring, Bedrock Runtime, AgentCore, Secrets Manager, KMS, X-Ray,
+  #   S3, ...). At about USD 7.30 per endpoint per month that is roughly
+  #   USD 66 a month before a single token is spent.
+  #
+  #   One NAT gateway. About USD 32 a month plus USD 0.045 per GB, covers
+  #   every AWS API the container needs, and is one resource to reason about
+  #   instead of thirteen.
+  #
+  # The NAT is chosen: half the cost, and it does not have to be revisited
+  # every time the runtime starts calling one more AWS service. The S3
+  # gateway endpoint is kept because it is free and keeps artifact pulls off
+  # the metered path. The databases remain PubliclyAccessible: false either
+  # way — this is about outbound reach, not inbound exposure.
 
-  EndpointSG:
-    Type: AWS::EC2::SecurityGroup
+  NatEip:
+    Type: AWS::EC2::EIP
     Properties:
-      GroupDescription: Ramco pilot VPC interface endpoints
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          SourceSecurityGroupId: !Ref RuntimeSG
-          Description: HTTPS from the AgentCore runtime only
+      Domain: vpc
       Tags: [{ Key: Project, Value: ramco-payce-pilot }]
 
-  BedrockEndpoint:
-    Type: AWS::EC2::VPCEndpoint
+  Nat:
+    Type: AWS::EC2::NatGateway
     Properties:
-      VpcId: !Ref VpcId
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.bedrock-runtime
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SubnetIds: !Ref SubnetIds
-      SecurityGroupIds: [!Ref EndpointSG]
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Select [0, !Ref SubnetIds]      # must live in a public subnet
+      Tags: [{ Key: Project, Value: ramco-payce-pilot }]
 
-  SecretsEndpoint:
-    Type: AWS::EC2::VPCEndpoint
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VpcId
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SubnetIds: !Ref SubnetIds
-      SecurityGroupIds: [!Ref EndpointSG]
+      Tags: [{ Key: Name, Value: ramco-pilot-private }]
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref Nat
+
+  # Two private subnets, in two availability zones, carved out of spare
+  # space in the default VPC. The runtime's network interfaces live here:
+  # outbound through the NAT, nothing inbound from the internet.
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: 172.31.240.0/20
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: ramco-pilot-private-a }]
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: 172.31.224.0/20
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: ramco-pilot-private-b }]
+
+  PrivateSubnetARoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PrivateSubnetA, RouteTableId: !Ref PrivateRouteTable }
+
+  PrivateSubnetBRoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref PrivateSubnetB, RouteTableId: !Ref PrivateRouteTable }
 
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -111,7 +150,7 @@ Resources:
       VpcId: !Ref VpcId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
       VpcEndpointType: Gateway
-      RouteTableIds: !Ref RouteTableIds
+      RouteTableIds: [!Ref PrivateRouteTable]
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -209,6 +248,10 @@ Resources:
       TargetType: AWS::RDS::DBInstance
 
 Outputs:
+  RuntimeSubnetList:
+    Description: Private subnets the AgentCore runtime attaches to
+    Value: !Join [',', [!Ref PrivateSubnetA, !Ref PrivateSubnetB]]
+
   RuntimeSecurityGroup: { Value: !Ref RuntimeSG }
   SubnetList:           { Value: !Join [',', !Ref SubnetIds] }
   EndpointIN:           { Value: !GetAtt DBInstanceIN.Endpoint.Address }
