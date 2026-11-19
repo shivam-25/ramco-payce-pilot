@@ -25,11 +25,30 @@ AWS_REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
 #
 # Nova Micro classifies: picking one of nine labels from two sentences is an
 # easy task and this is the cheapest token on the account.
-# Nova Lite drafts: drafting needs more than Micro and far less than Pro.
-# Nova Pro judges: a judge should outrank the model it grades, or it is
-# grading its own homework.
+#
+# Nova Pro drafts. It was Lite, chosen to be frugal, and measuring that choice
+# showed there was nothing to be frugal about: cost per ticket is USD 0.00004
+# against the brief's cap of USD 4.50, about a hundred thousand times of head
+# room. Drafted both arms over the 35-question golden set, same corpus, same
+# retrieval, same questions. Pro answered the same 29 and withheld the same 3,
+# took the same time (p50 7.40s both, p95 7.73 -> 7.88), cost eight times more
+# -- USD 0.000537 a question, still four orders of magnitude under the cap --
+# and got more right: must_contain 5/5 against 4/5, must_abstain 5/5 against
+# 4/5. Those two are string checks against the golden set, so no model graded
+# them.
+#
+# Nova Pro also judges, which is now the same model drafting and grading. That
+# is the thing the previous note here warned against, and it is a real cost of
+# this change: G5's faithfulness number is self-graded from here and should be
+# read as indicative, not as a gate, until a stronger judge exists. The same
+# run measured the judge's own noise at about +/-0.04, by scoring context
+# precision and recall -- retrieval metrics, identical inputs in both arms --
+# and getting 0.934/0.904 for one and 0.895/0.942 for the other.
+#
+# When the Claude use-case form clears, the judge moves up a class and the
+# gate becomes trustworthy again. That is the first thing to do with it.
 CLASSIFY_MODEL = os.environ.get("BEDROCK_CLASSIFY_MODEL", "apac.amazon.nova-micro-v1:0")
-DRAFT_MODEL = os.environ.get("BEDROCK_DRAFT_MODEL", "apac.amazon.nova-lite-v1:0")
+DRAFT_MODEL = os.environ.get("BEDROCK_DRAFT_MODEL", "apac.amazon.nova-pro-v1:0")
 JUDGE_MODEL = os.environ.get("BEDROCK_JUDGE_MODEL", "apac.amazon.nova-pro-v1:0")
 EMBED_MODEL = os.environ.get("BEDROCK_EMBED_MODEL", "amazon.titan-embed-text-v2:0")
 EMBED_DIMS = int(os.environ.get("EMBED_DIMS", "512"))

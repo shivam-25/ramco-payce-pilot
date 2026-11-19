@@ -433,3 +433,93 @@ Two options that would add information, neither attempted here:
 
 The gate stays honestly failing at 90.0%, against an intake dropdown at
 84.8%. The pilot still fixes 43 of the 56 misroutes in the sample.
+
+## An escalation is not a reply, and the drafter was too cheap
+
+Two optimisations, found by chasing a number the console put on screen.
+
+### The console said 50% of replies carried a citation. It was right to.
+
+The brief wants 100% of replies carrying a verifiable citation. The new
+scoreboard read 50%, which looked like a metric bug and was not.
+
+When the drafting model cannot answer it is told to write ESCALATE. It does,
+but it writes its reasoning first, and `answer()` returned all of it as the
+draft:
+
+    The current ESI employee contribution rate for India staff is not
+    provided in the passages. Passage [1] discusses the EPF wage ceiling,
+    and passage [3] discusses TDS slabs, but neither mention ESI rates.
+    [...] ESCALATE
+
+The console renders `draft` as the reply, so internal passage numbering and
+the word ESCALATE sat in the field a support agent reads as text to send.
+Worse, the `[1]` and `[3]` in that paragraph were being harvested as
+citations — the passages the model was explicitly ruling *out* would have
+been attached to a refusal as though they supported it.
+
+Every other escalation path in `answer.py` returns an empty draft. This one
+was the exception, and nothing downstream could catch it, because an
+escalation that carries a draft still routes to a human and still looks
+correct from the outside.
+
+Fixed: an escalation returns no draft and no citations, and the model's
+explanation becomes the reason the colleague picking it up reads. Measured
+over the six console tickets afterwards: **2 of 2 replies carry a citation,
+100%**, with four escalations correctly carrying nothing.
+
+This did not move faithfulness — G5 already excludes escalated rows from
+scoring, which was checked rather than assumed.
+
+### The drafting model was chosen to save money that did not need saving
+
+Cost per ticket is USD 0.00004 against the brief's cap of USD 4.50. That is
+about a hundred thousand times of head room, and the pilot was running the
+cheapest drafter on the account while faithfulness sat at 0.814 against a
+0.90 gate.
+
+Both drafters over the same 35 golden questions, same corpus, same retrieval,
+drafted inside the VPC through a new runtime eval path and scored outside it:
+
+| | Nova Lite | Nova Pro |
+|---|---|---|
+| answered | 29 | 29 |
+| withheld by output check | 3 | 3 |
+| **must_contain** | 4/5 | **5/5** |
+| must_not_contain | 2/2 | 2/2 |
+| **must_abstain** | 4/5 | **5/5** |
+| p50 latency | 7.40s | 7.40s |
+| p95 latency | 7.73s | 7.88s |
+| cost per question | USD 0.000067 | USD 0.000537 |
+| faithfulness (judged) | 0.699 | 0.817 |
+
+`must_contain` and `must_abstain` are string checks against the golden set.
+No model grades them, and they are the reason this change was made: the
+judged numbers alone would not have been enough.
+
+**Three honest caveats.**
+
+The judged faithfulness figures are *not* comparable to the 0.814 on record
+further up this document. That was a different run under different
+conditions; Lite scored 0.699 here. Only the within-run comparison holds.
+
+The judge is Nova Pro, so the Pro arm is partly grading its own homework.
+The same run puts a number on how much that matters: context precision and
+recall are retrieval metrics, and both arms retrieved identically, so they
+should have scored the same twice. They came back 0.934/0.904 and
+0.895/0.942 — a judge-noise floor around ±0.04. The faithfulness gap of
+0.118 is roughly three times that, but self-preference is inside it.
+
+The deterministic wins are one question each out of five. Directional, not
+conclusive.
+
+**Adopted anyway**, because the evidence points one way on every measure that
+does not depend on a judge, there is no measured downside — same answers
+withheld, same latency — and the cost argument for Lite does not survive
+contact with the cap.
+
+The price is that the drafter and the judge are now the same model, which the
+note in `config.py` previously warned against in as many words. G5's
+faithfulness number is self-graded from here and should be read as
+indicative rather than as a gate. When the Claude use-case form clears, move
+the judge up a class first; that restores the gate and costs nothing else.

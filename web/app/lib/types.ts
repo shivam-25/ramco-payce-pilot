@@ -62,7 +62,7 @@ function plainReason(reason: string): string {
   if (r.includes("customer not found"))
     return "That customer is not in the pilot's records.";
   if (r.includes("escalat"))
-    return "The rules do not cover this, and guessing is not an option.";
+    return "The rules retrieved do not cover this question, so nothing was drafted.";
   return reason || "A person should handle this one.";
 }
 

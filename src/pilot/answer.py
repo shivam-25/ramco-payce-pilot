@@ -141,11 +141,29 @@ def answer(conn, question: str, *, region: str, as_of: date,
     text, usage = converse(DRAFT_MODEL, prompt, system=SYSTEM,
                            max_tokens=400, temperature=0.0)
 
-    escalate = "ESCALATE" in text.upper()
+    if "ESCALATE" in text.upper():
+        # When the model declines, what it wrote is an explanation for the
+        # person picking the ticket up -- not a reply to the customer. This
+        # path used to return it as the draft, which put internal reasoning
+        # ("Passage [1] discusses the EPF wage ceiling...") and the literal
+        # word ESCALATE into the field the console renders as text to send.
+        # Every other escalation in this file returns no draft; this one was
+        # the exception, and nothing downstream could tell the difference
+        # because an escalation that carries a draft still routes to a human.
+        #
+        # The passage numbers it cites here are the ones it is ruling OUT, so
+        # they are not citations either. Carrying them would have counted a
+        # refusal as a cited reply.
+        why = re.sub(r"\bESCALATE\b", "", text, flags=re.I)
+        why = re.sub(r"\s+", " ", why).strip(" .")
+        return Draft(text="", citations=[], passages=hits, escalate=True,
+                     usage=usage,
+                     reason=f"model escalated: {why[:240]}" if why
+                            else "model escalated")
+
     cited = sorted({m for m in re.findall(r"\[(\d+)\]", text)}, key=int)
     citations = [hits[int(c) - 1].source_id for c in cited
                  if 0 < int(c) <= len(hits)]
 
     return Draft(text=text.strip(), citations=citations, passages=hits,
-                 escalate=escalate, usage=usage,
-                 reason="model escalated" if escalate else "")
+                 escalate=False, usage=usage, reason="")

@@ -40,6 +40,13 @@ class Invocation(BaseModel):
     # A one-shot corpus migration, reachable only the same way the sweep is.
     admin: str | None = None
 
+    # Draft the golden set and hand back what a judge needs. Same reachability
+    # as the sweep: the databases are private, so drafting against the real
+    # corpus can only happen in here, while scoring the drafts needs no
+    # database and stays outside.
+    eval_answer: list[dict] | None = None
+    eval_draft_model: str | None = None
+
 
 @app.get("/ping")
 def ping() -> dict:
@@ -93,6 +100,53 @@ def _strip_superseded() -> dict:
     return {"admin": "strip_superseded", "regions": done}
 
 
+def _answer_set(questions: list[dict], draft_model: str | None) -> dict:
+    """Retrieve and draft each question, returning what Ragas needs. The
+    model is overridable per request so two drafters can be compared without
+    a redeploy -- the comparison is the point, and redeploying between arms
+    would leave the corpus and the quota in a different state for each."""
+    from .db import connect
+    from .answer import answer
+    from . import answer as answer_mod
+    from .outputcheck import check as output_check
+    from .config import TOP_K, REGIONS
+    from .pipeline import DEFAULT_CHUNKING, DEFAULT_RETRIEVAL
+    from contextlib import ExitStack
+    from datetime import date as _date
+
+    was = answer_mod.DRAFT_MODEL
+    if draft_model:
+        answer_mod.DRAFT_MODEL = draft_model
+    out = []
+    try:
+        with ExitStack() as stack:
+            conns = {r: stack.enter_context(connect(r)) for r in REGIONS}
+            for q in questions:
+                region = q.get("region") or "IN"
+                as_of = (_date.fromisoformat(q["as_of"])
+                         if q.get("as_of") else None)
+                d = answer(conns[region], q["question"], region=region,
+                           as_of=as_of, chunk_strategy=DEFAULT_CHUNKING,
+                           retrieval_strategy=DEFAULT_RETRIEVAL, k=TOP_K)
+                chk = output_check(d, tier="Enterprise", priority="P3",
+                                   payroll_week=False)
+                out.append({
+                    "id": q.get("id"),
+                    "question": q["question"],
+                    "answer": d.text,
+                    "contexts": [h.text for h in d.passages],
+                    "citations": d.citations,
+                    "escalated": d.escalate or not d.grounded,
+                    "check_passed": chk.passed,
+                    "check_failures": list(chk.failures),
+                    "usd": d.usage.usd if d.usage else 0.0,
+                    "seconds": d.usage.seconds if d.usage else 0.0,
+                })
+    finally:
+        answer_mod.DRAFT_MODEL = was
+    return {"rows": out, "draft_model": draft_model or was}
+
+
 def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
     """Retrieve only — no drafting, no model judgement. Returns what came
     back so the caller can score it with set arithmetic."""
@@ -133,6 +187,9 @@ def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
 def invocations(payload: Invocation) -> dict:
     if payload.admin == "strip_superseded":
         return _strip_superseded()
+
+    if payload.eval_answer is not None:
+        return _answer_set(payload.eval_answer, payload.eval_draft_model)
 
     if payload.eval_retrieval is not None:
         return _retrieval_sweep(
