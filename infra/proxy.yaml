@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Function URL in front of the Ramco Payce AgentCore runtime, so the Vercel
+  UI can call the pilot without holding AWS credentials.
+
+Parameters:
+  RuntimeArn:
+    Type: String
+  ApiKey:
+    Type: String
+    NoEcho: true
+  Qualifier:
+    Type: String
+    Default: DEFAULT
+
+Resources:
+  ProxyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: invoke-this-runtime-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # One action, one resource. The function can run the pilot and
+              # can do nothing else in this account.
+              - Effect: Allow
+                Action: bedrock-agentcore:InvokeAgentRuntime
+                Resource:
+                  - !Ref RuntimeArn
+                  - !Sub '${RuntimeArn}/*'
+
+  ProxyFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ramco-pilot-proxy
+      Runtime: python3.12
+      Architectures: [arm64]
+      Handler: index.handler
+      Role: !GetAtt ProxyRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          RUNTIME_ARN: !Ref RuntimeArn
+          API_KEY: !Ref ApiKey
+          QUALIFIER: !Ref Qualifier
+      Code:
+        ZipFile: PLACEHOLDER
+
+  ProxyUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ProxyFunction.Arn
+      AuthType: NONE          # authenticated by the x-pilot-key header
+      Cors:
+        AllowOrigins: ['*']
+        AllowHeaders: ['content-type', 'x-pilot-key']
+        AllowMethods: ['POST']
+
+  ProxyUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ProxyFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  FunctionUrl: { Value: !GetAtt ProxyUrl.FunctionUrl }

@@ -1,0 +1,8 @@
+-r requirements.txt
+pytest>=8.3
+pytest-asyncio>=0.24
+ragas>=0.2.9
+langchain-aws>=0.2.10
+datasets>=3.0
+pandas>=2.2
+tabulate>=0.9

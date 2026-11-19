@@ -1,0 +1,32 @@
+# ---- case data never leaves this machine ------------------------------
+# The brief says to keep case data out of public services. A private repo is
+# still a service. Nothing derived from real tickets is tracked: not the
+# export, not the masked copies, not the drafts the model wrote about them.
+data/
+data_room/
+data-room/
+*.csv
+*.jsonl
+*.sqlite3
+evals/reports/*.json
+evals/reports/*.log
+evals/golden/
+!evals/golden/.gitkeep
+
+# ---- credentials ------------------------------------------------------
+.aws/
+.env
+.env.local
+*.pem
+aws-env.sh
+
+# ---- build / local ----------------------------------------------------
+.venv/
+dist/
+__pycache__/
+*.pyc
+.direnv/
+node_modules/
+.next/
+.vercel/
+.DS_Store

@@ -1,0 +1,217 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Ramco Payce pilot. One Postgres+pgvector database per customer region.
+  In production this same template deploys to ap-south-1 (IN) and me-central-1 (UAE);
+  this AWS project is SCP-locked to a single region, so both instances run here with
+  separate credentials, separate security groups and no shared connection.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  RouteTableIds:
+    Type: CommaDelimitedList
+    Description: Route tables the S3 gateway endpoint attaches to
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  EngineVersion:
+    Type: String
+    Default: '18.6'
+
+Resources:
+
+  # ---- networking -------------------------------------------------------
+  # One security group for the AgentCore runtime ENIs, one for each database.
+  # The databases accept 5432 ONLY from the runtime group. Nothing is public.
+
+  RuntimeSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Ramco pilot AgentCore runtime ENIs
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Bedrock, Secrets Manager and S3 over TLS
+      Tags: [{ Key: Project, Value: ramco-payce-pilot }]
+
+  DBSecurityGroupIN:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Ramco pilot - India database
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref RuntimeSG
+          Description: AgentCore runtime only
+      Tags: [{ Key: Project, Value: ramco-payce-pilot }, { Key: DataRegion, Value: IN }]
+
+  DBSecurityGroupUAE:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Ramco pilot - UAE database
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref RuntimeSG
+          Description: AgentCore runtime only
+      Tags: [{ Key: Project, Value: ramco-payce-pilot }, { Key: DataRegion, Value: UAE }]
+
+  # ---- private egress ---------------------------------------------------
+  # The runtime sits in the VPC so it can reach a private database. It still
+  # needs Bedrock, Secrets Manager and S3. Interface endpoints give it those
+  # without a NAT gateway and without putting anything on the public
+  # internet: roughly USD 15 a month for the two interface endpoints, versus
+  # about USD 32 for a NAT gateway, and the S3 gateway endpoint is free.
+  # This is a real line in the pilot's run cost and is carried into the cost
+  # sheet rather than quietly omitted.
+
+  EndpointSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Ramco pilot VPC interface endpoints
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref RuntimeSG
+          Description: HTTPS from the AgentCore runtime only
+      Tags: [{ Key: Project, Value: ramco-payce-pilot }]
+
+  BedrockEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.bedrock-runtime
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: [!Ref EndpointSG]
+
+  SecretsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: [!Ref EndpointSG]
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcEndpointType: Gateway
+      RouteTableIds: !Ref RouteTableIds
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Ramco pilot databases
+      SubnetIds: !Ref SubnetIds
+
+  # ---- secrets ----------------------------------------------------------
+  # Separate secret per region. The runtime resolves exactly one of them,
+  # chosen by the router from the customer's region. There is no code path
+  # that holds both connections open at once.
+
+  DBSecretIN:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: ramco/pilot/db/IN
+      Description: Ramco pilot India database credentials
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"ramco_in"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\''`'
+
+  DBSecretUAE:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: ramco/pilot/db/UAE
+      Description: Ramco pilot UAE database credentials
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"ramco_uae"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\''`'
+
+  # ---- databases --------------------------------------------------------
+  # db.t4g.micro, single-AZ, 20 GB gp3, no public access, 1-day backups.
+  # Sized to sit inside the free-tier class on a ~USD 100 credit balance.
+  # Each instance holds structured data, vectors and the semantic cache:
+  # one database, one hop, as the study note argues.
+
+  DBInstanceIN:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    Properties:
+      DBInstanceIdentifier: ramco-in
+      DBName: ramco
+      Engine: postgres
+      EngineVersion: !Ref EngineVersion
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: '20'
+      StorageType: gp3
+      MultiAZ: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups: [!Ref DBSecurityGroupIN]
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecretIN}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecretIN}:SecretString:password}}'
+      Tags: [{ Key: Project, Value: ramco-payce-pilot }, { Key: DataRegion, Value: IN }]
+
+  DBInstanceUAE:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    Properties:
+      DBInstanceIdentifier: ramco-uae
+      DBName: ramco
+      Engine: postgres
+      EngineVersion: !Ref EngineVersion
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: '20'
+      StorageType: gp3
+      MultiAZ: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups: [!Ref DBSecurityGroupUAE]
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecretUAE}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecretUAE}:SecretString:password}}'
+      Tags: [{ Key: Project, Value: ramco-payce-pilot }, { Key: DataRegion, Value: UAE }]
+
+  SecretAttachIN:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DBSecretIN
+      TargetId: !Ref DBInstanceIN
+      TargetType: AWS::RDS::DBInstance
+
+  SecretAttachUAE:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DBSecretUAE
+      TargetId: !Ref DBInstanceUAE
+      TargetType: AWS::RDS::DBInstance
+
+Outputs:
+  RuntimeSecurityGroup: { Value: !Ref RuntimeSG }
+  SubnetList:           { Value: !Join [',', !Ref SubnetIds] }
+  EndpointIN:           { Value: !GetAtt DBInstanceIN.Endpoint.Address }
+  EndpointUAE:          { Value: !GetAtt DBInstanceUAE.Endpoint.Address }
+  SecretArnIN:          { Value: !Ref DBSecretIN }
+  SecretArnUAE:         { Value: !Ref DBSecretUAE }
