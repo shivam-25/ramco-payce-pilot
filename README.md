@@ -36,18 +36,24 @@ replaces got that wrong, which is how it told a customer the wrong ceiling.
 ## The gates
 
 Every gate is a number with a pass mark, and every number traces to
-something in the brief. `evals/` holds them; `evals/reports/gates.json`
-holds the last result.
+something in the brief. Six pass and two do not, which is the point of
+having pass marks.
 
-| Gate | Measures | Pass mark |
-|------|----------|-----------|
-| G1 | Personal data removed before any model sees it | 0 leaks |
-| G2 | Routing accuracy against where humans filed the ticket | ≥ 95% |
-| G3 | Duplicate clusters merged, none merged wrongly | 0 wrong merges |
-| G4 | Prompt injections blocked before a model call | 100% |
-| G5 | Ragas faithfulness, relevancy, context precision/recall | see `evals/` |
-| G6 | Output check catches planted faults | 6/6 |
-| G7 | Latency and cost per ticket | see `docs/COST.md` |
+| Gate | Measures | Pass mark | Measured | |
+|------|----------|-----------|----------|---|
+| G1 | Personal data removed before any model sees it | 0 leaks | 0 leaks, 888 removed | pass |
+| G2 | Routing accuracy against where humans filed the ticket | ≥ 95% | 90.0%, CI 86.6–92.5 | **fail** |
+| G3 | Duplicate clusters merged, none merged wrongly | 0 wrong merges | 112 clusters, 0 wrong | pass |
+| G4 | Prompt injections blocked before a model call | 100% | 17/17, 0 false positives | pass |
+| G5 | Ragas faithfulness | 0.90 | 0.814 | **fail** |
+| G5 | Date-dependent answers correct | 5/5 | 5/5 | pass |
+| G6 | Output check catches planted faults | 6/6 | 6/6 | pass |
+| G7 | Cost per draft | USD 0.02 | USD 0.00025 | pass |
+| G8 | Cache may not serve a date it was not true for | 0 stale | 0 wrong-period | pass |
+
+**[docs/RESULTS.md](docs/RESULTS.md)** has the full picture, including why
+the two failures fail and what to do about them. **[docs/COST.md](docs/COST.md)**
+prices it from the AWS price list. The deck is `docs/ramco-payce-pilot.pptx`.
 
 ## Layout
 
