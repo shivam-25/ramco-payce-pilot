@@ -21,6 +21,7 @@ from datetime import date
 
 from .bedrock import converse, Usage
 from .config import DRAFT_MODEL, TOP_K
+from .chunking import STUB_MARKER
 from .retrieval import Hit, retrieve
 
 # The floor below which retrieval has returned nothing at all and the model
@@ -104,11 +105,35 @@ def answer(conn, question: str, *, region: str, as_of: date,
     hits, embed_usage = retrieve(conn, chunk_strategy, retrieval_strategy,
                                  question, k=k, region=region, as_of=as_of)
 
-    best = max((h.sim for h in hits), default=0.0)
-    if not hits or best < SCORE_FLOOR:
+    # A KB index entry names an article and points at Confluence. There is
+    # no body in it to ground an answer on, so it is not worth paying a
+    # model to discover that. Drop stubs before drafting, and abstain only
+    # if nothing substantive survives — one real passage among four stubs
+    # is still an answerable question.
+    #
+    # Output check C7 used to catch this, but only after generation, so a
+    # draft was bought in order to be thrown away. The decision is the same
+    # and arrives earlier. C7 stays as a backstop for the different case
+    # where real passages are retrieved and the model answers with a
+    # pointer anyway.
+    if not hits:
+        return Draft(text="", escalate=True, passages=[],
+                     reason="retrieval returned nothing for this question")
+
+    substantive = [h for h in hits if STUB_MARKER not in (h.text or "")]
+    if not substantive:
+        return Draft(text="", escalate=True, passages=hits,
+                     reason="every retrieved passage is a KB index entry "
+                            "with no body; a pointer is not an answer")
+
+    # The floor is judged on what can actually be drafted from, not on a
+    # stub that happened to embed well.
+    best = max((h.sim for h in substantive), default=0.0)
+    if best < SCORE_FLOOR:
         return Draft(text="", escalate=True, passages=hits,
                      reason=f"no passage above the score floor "
                             f"(best {best:.2f} < {SCORE_FLOOR})")
+    hits = substantive
 
     prompt = (f"Question date: {as_of}\nCustomer region: {region}\n\n"
               f"Passages:\n{_format(hits, as_of)}\n\n"

@@ -170,3 +170,41 @@ Priced from the AWS Price List API for `ap-southeast-2`, published
 
 Ninety-seven percent of the run cost is always-on infrastructure. Doubling
 ticket volume changes the bill by about a dollar.
+
+## G9: dropping stubs before the draft, and what it did not buy
+
+KB index entries are now removed from the retrieved set before the draft
+call, instead of being caught after generation by output check C7. The
+implementation is correct and G9 pins four properties, including the one
+that would have failed silently: `[1]` in a citation must mean the first
+*surviving* passage, not the first retrieved one.
+
+The predicted benefit did not materialise, and the measurement says why.
+
+| | before | after |
+|---|---|---|
+| wall p50 / p95 | 5.50 s / 6.17 s | 5.34 s / 6.77 s |
+| pipeline p50 / p95 | 1.28 s / 1.43 s | 1.31 s / 1.52 s |
+| prompt tokens saved | — | ~38 of ~1,541 (2.5%) |
+
+Latency is unchanged within noise. The saving was supposed to come from
+abstaining before paying for a draft, and **that path essentially never
+fires**: it needs every passage in the top 5 to be a stub, but stubs are
+only 43% of the Indian corpus, so a substantive chunk always fills a slot
+even when it is irrelevant. The condition is close to unreachable at k=5.
+
+What did improve is honesty. Asked for the ESI rate, the pilot used to read
+a stub and draft "the rate is available in KB-0140", which C7 then withheld.
+It now says it cannot provide the rate. Same routing decision, same cost, a
+better reason — and stub text can no longer mislead the model into
+manufacturing a pointer.
+
+The change is kept because noise in a grounding prompt is categorically
+wrong, not because it paid for itself. It did not.
+
+The measurement also sharpens the top recommendation. **All 24 KB articles
+have no body** — the knowledge base is 100% pointers. Every KB-shaped
+question is unanswerable no matter what the pipeline does, and 43% of the
+index is occupied by chunks that cannot ground an answer, which also costs
+retrieval precision. Getting the Confluence bodies is worth more than any
+remaining pipeline work.

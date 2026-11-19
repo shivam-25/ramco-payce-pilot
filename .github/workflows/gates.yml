@@ -48,6 +48,9 @@ jobs:
           print("all modules import cleanly")
           PY
 
+      - name: G9 — a KB index entry is not an answer
+        run: python evals/test_g9_stub_gate.py
+
       - name: nothing resembling case data is tracked
         run: |
           if git ls-files | grep -Ei 'data-room|tickets_export|\.jsonl$|\.csv$'; then
