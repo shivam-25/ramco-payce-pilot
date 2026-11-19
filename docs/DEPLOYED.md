@@ -78,3 +78,26 @@ Every line below is the API's own answer, not a description of one.
 |  ramco-payce-pilot-RuntimeSG-CbvK1lYBjO9D          |  None                  |  None |
 +----------------------------------------------------+------------------------+-------+
 ```
+
+## Public entry point
+
+The browser never talks to AWS directly, and no AWS credential exists on
+Vercel.
+
+```
+browser → ramco-payce-pilot.vercel.app
+        → Next.js route handler (holds the shared secret, server-side only)
+        → API Gateway HTTP API  h5j5ecx082
+        → Lambda ramco-pilot-proxy  (validates x-pilot-key, filters the payload)
+        → AgentCore runtime, in the VPC
+        → private Postgres, reachable only from the runtime's security group
+```
+
+The org guardrail blocks public Lambda Function URLs (`AuthType NONE`
+returns 403), so the Function URL stays `AWS_IAM` and the public edge is an
+API Gateway HTTP API instead. Authentication is the shared secret the Lambda
+already validated. Verified: no key → 401, wrong key → 401, correct key →
+200 with a cited answer.
+
+The Lambda accepts only `subject`, `body`, `customer_id`, `as_of` and
+`use_cache`, so the public edge cannot reach anything else in the account.
