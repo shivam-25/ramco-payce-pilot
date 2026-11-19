@@ -20,7 +20,7 @@ Where a number is a sample, it says so and carries an interval.
 Retrieval quality, measured by Ragas on Bedrock: context precision 0.89,
 context recall 0.93.
 
-## The two failures
+## The three failures
 
 **Routing, 90.0% against 95%.** It is better than what exists — the intake
 dropdown gets 86.0% right on the same tickets — and it fixes 50 of the 56
@@ -75,33 +75,39 @@ model is Nova Lite, chosen because every Anthropic model on this account
 returns "Model use case details have not been submitted". A stronger drafter
 is the obvious next experiment and is currently blocked on a console form.
 
-## G7 latency: measured wrong, and not yet measured right
+## G7 latency: measured wrong twice, then measured properly
 
-The sweep reports a p95 of 25 seconds against a 3-second mark, and that
-number is not the pilot. Bedrock gives this account 20 requests a minute;
-the sweep asks for more, so most of those seconds are the eval harness
-asleep in a rate limiter.
+The sweep first reported 48 seconds, then 25, against a 3-second mark, and
+neither number was the pilot. Bedrock gives this account 20 requests a
+minute; the sweep asks for more, so most of those seconds were the eval
+harness asleep in a rate limiter.
 
 The first attempt to separate the two was wrong in an instructive way. It
-summed each box's own timing, on the assumption that box time was work time.
+summed each box's own timing on the assumption that box time was work time.
 It is not: the limiter sleeps *inside* the call the box is timing, so every
-box carries its own wait and the sum changed nothing. The limiter now tallies
-what it slept and the tally is subtracted from wall time.
+box carries its own wait and the sum changed nothing.
 
-That correction is written and unit-tested but **has not been run against the
-pilot**, because closing the databases to the internet — the right thing to
-do, and done — also closed this machine's path to running the sweep locally.
-The gate is therefore recorded as not established rather than as a pass.
+The measurement that settles it runs through the deployed public endpoint,
+sequentially, at production pace, with the cache disabled so every request
+does the full job. Nothing queues, because production volume is 1.4 requests
+a minute against a 10–20 rpm quota. Twelve requests:
 
-What *is* measured is the deployed path. Every screenshot in `docs/screenshots`
-reports its own per-box timings from a real request through AgentCore, and
-they sum to about 1.5 seconds, of which the answer step is 472 ms. That is
-the customer path and it is comfortably inside the mark, but five hand-driven
-requests are evidence, not a p95, and this document will not call them one.
+| | p50 | p95 |
+|---|---|---|
+| Wall, what a customer waits | 5.50 s | **6.17 s** |
+| The pipeline's own work | 1.28 s | 1.43 s |
+| Platform invoke path | 4.26 s | 4.79 s |
 
-The arithmetic that says the quota does not bind in production is in the
-test's own output: 15,000 tickets a month over 22 working days is 1.4
-requests a minute, 4.3 at a 3x peak, against a 10–20 rpm quota.
+**The gate fails, and the pipeline is not why.** Its nine boxes finish in
+1.43 seconds at p95, comfortably inside the mark. The remaining 4.8 seconds
+is the path a request takes to reach them: API Gateway, then Lambda, then
+the AgentCore invoke call. Three quarters of what the customer waits for is
+spent before any of this code runs.
+
+That makes the fix an infrastructure one rather than a pipeline one — keep
+the runtime warm, or drop the Lambda hop and let API Gateway reach AgentCore
+directly. Neither is attempted here, and a faster prompt would not move this
+number by a tenth of a second.
 
 ## Chunking and retrieval, chosen by measurement
 

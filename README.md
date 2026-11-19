@@ -1,5 +1,7 @@
 # Ramco Payce support triage pilot
 
+**Live:** https://ramco-payce-pilot.vercel.app
+
 A six-week pilot that answers the cheap, repetitive half of a payroll
 provider's support queue and hands the rest to a person, with the reasons
 written down.
@@ -36,7 +38,7 @@ replaces got that wrong, which is how it told a customer the wrong ceiling.
 ## The gates
 
 Every gate is a number with a pass mark, and every number traces to
-something in the brief. Six pass and two do not, which is the point of
+something in the brief. Six pass and three do not, which is the point of
 having pass marks.
 
 | Gate | Measures | Pass mark | Measured | |

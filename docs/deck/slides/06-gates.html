@@ -19,14 +19,14 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 .row { display:flex; gap:12pt; }
 
 .hr{display:flex;background:#1A2130;border:1px solid #242C3A;border-radius:4pt 4pt 0 0;padding:5pt 9pt;}
-.rw{display:flex;border:1px solid #242C3A;border-top:none;padding:5pt 9pt;background:#141922;}
+.rw{display:flex;border:1px solid #242C3A;border-top:none;padding:3.5pt 9pt;background:#141922;}
 .rw.f{background:#231419;border-color:#4A2130;}
 .c1{width:34pt;}.c2{width:206pt;}.c3{width:124pt;}.c4{width:214pt;}.c5{width:60pt;}
 .hr p{margin:0;color:#8B95A7;font-size:7.5pt;font-family:"Courier New",monospace;letter-spacing:0.6pt;}
-.rw p{margin:0;color:#C6CCD8;font-size:8.5pt;font-family:"Courier New",monospace;}
+.rw p{margin:0;color:#C6CCD8;font-size:8pt;font-family:"Courier New",monospace;}
 </style></head><body><div class="slide">
 <p class="kicker">THE GATES — EIGHT NUMBERS WITH PASS MARKS</p>
-<h1>Six pass. Two do not.</h1>
+<h1>Six pass. Three do not.</h1>
 <div style="margin-top:10pt;">
 <div class="hr"><p class="c1"></p><p class="c2">WHAT IT MEASURES</p><p class="c3">PASS MARK</p><p class="c4">MEASURED</p><p class="c5"></p></div>
 <div class="rw"><p class="c1">G1</p><p class="c2">personal data removed first</p><p class="c3">0 leaks</p><p class="c4">0 leaks · 888 identifiers removed</p><p class="c5 ok">PASS</p></div>
@@ -37,8 +37,9 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 <div class="rw"><p class="c1">G5</p><p class="c2">date-dependent answers</p><p class="c3">5/5</p><p class="c4">5/5</p><p class="c5 ok">PASS</p></div>
 <div class="rw"><p class="c1">G6</p><p class="c2">output check catches bad drafts</p><p class="c3">6/6 planted</p><p class="c4">6/6 · 4 real drafts withheld with reasons</p><p class="c5 ok">PASS</p></div>
 <div class="rw"><p class="c1">G7</p><p class="c2">cost per draft</p><p class="c3">USD 0.02</p><p class="c4">USD 0.00016</p><p class="c5 ok">PASS</p></div>
+<div class="rw f"><p class="c1">G7</p><p class="c2">first reply, p95</p><p class="c3">3 s</p><p class="c4">6.17 s &mdash; pipeline 1.43 s, platform 4.79 s</p><p class="c5 accent">FAIL</p></div>
 <div class="rw"><p class="c1">G8</p><p class="c2">cache may not cross a policy change</p><p class="c3">0 stale</p><p class="c4">0 wrong-period · 4/4 reused in window</p><p class="c5 ok">PASS</p></div>
 </div>
-<p class="body" style="margin-top:11pt;width:645pt;">Two failures, both real and both diagnosed. Routing beats the intake dropdown (86.0% &rarr; 90.0%) and fixes 50 of the 56 misroutes a human had to undo, but the interval tops out at 92.5%, so the sample settles it rather than inviting another run.</p>
-<p class="body" style="width:645pt;">Faithfulness moved <span class="mono">0.756 &rarr; 0.814</span> when pointer answers started being withheld. Retrieval is not the problem &mdash; it finds the right document nine times in ten and then drifts inside it.</p>
+<p class="body" style="margin-top:9pt;width:645pt;">Routing beats the intake dropdown (86.0% &rarr; 90.0%) and fixes 50 of the 56 misroutes a human had to undo, but the interval tops out at 92.5%, so the sample settles it.</p>
+<p class="body" style="width:645pt;">Latency fails for a reason worth separating out. Measured through the deployed endpoint at production pace, the pipeline's own work is <span class="mono">1.43 s</span> at p95 &mdash; inside the mark. The other <span class="mono">4.79 s</span> is the invoke path: API Gateway, Lambda, AgentCore. The slow part is not the thing I built.</p>
 </div></body></html>

@@ -18,12 +18,12 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 .accent { color:#E8336D; }
 .row { display:flex; gap:12pt; }
 .slide{padding:26pt 34pt;}
-.cap{width:248pt;}
+.cap{width:286pt;}
 .wrap{display:flex;gap:16pt;}
-img{width:382pt;height:214.2pt;border:1px solid #242C3A;border-radius:5pt;}
+img{width:340pt;height:236.3pt;border:1px solid #242C3A;border-radius:5pt;}
 </style></head><body><div class="slide">
 <p class="kicker">PROOF — THE SAME QUESTION, A DIFFERENT MONTH</p><h2>Asked in September, answered 25,000 — from cache.</h2>
 <div class="wrap"><div class="cap"><p class="body">Same sentence, different payroll date, different correct answer: <span style="font-weight:bold;color:#3ECF8E;">INR 25,000</span>.</p>
-<p class="body">This one is served from the semantic cache at 0.995 similarity for <span class="mono">USD 0.000013</span> &mdash; a fifth of the price, no model call to draft.</p>
+<p class="body">Served from the semantic cache at <span class="mono">0.995</span> similarity to the June question &mdash; and it still answers 25,000. That is the fix working in production, not in a test.</p>
 <p class="body">The cache originally broke this. It matched on meaning and ignored time, so September got June&rsquo;s answer. Each entry now carries the window it is true for.</p></div><img src="02-september-answer-25000-cache-hit.jpg"></div>
 </div></body></html>
