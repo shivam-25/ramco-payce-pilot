@@ -228,7 +228,11 @@ export function score(rows: Row[]): Score | null {
     alone: `${Math.round(100 * alone / done.length)}%`,
     seen: done.length,
     drafted: alone,
-    toPerson: done.length - alone,
+    // Refused tickets are a hand-off too, so they were being counted here
+    // AND in `refused`, which made the footer read "4 to you" under a chip
+    // offering 3. The piles have to partition: drafted + to you + refused
+    // is every handled ticket, each counted once.
+    toPerson: done.length - alone - refused,
     refused,
     spend: `$${done.reduce((a, r) => a + (r.result!.usd || 0), 0).toFixed(4)}`,
   };
