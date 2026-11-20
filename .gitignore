@@ -33,3 +33,9 @@ node_modules/
 
 # Rendered slide PNGs are build output; the HTML in docs/deck is the source.
 docs/screenshots/*.png
+
+# deck build: vendored from the doc-pptx skill, and screenshots copied in at build time
+docs/deck/node_modules/
+docs/deck/package*.json
+docs/deck/html2pptx.js
+docs/deck/slides/*.jpg

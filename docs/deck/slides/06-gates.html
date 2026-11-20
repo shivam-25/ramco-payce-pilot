@@ -26,7 +26,7 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 .rw p{margin:0;color:#C6CCD8;font-size:8pt;font-family:"Courier New",monospace;}
 </style></head><body><div class="slide">
 <p class="kicker">THE GATES — EIGHT NUMBERS WITH PASS MARKS</p>
-<h1>Six pass. Three do not.</h1>
+<h1>Seven pass. Two do not.</h1>
 <div style="margin-top:10pt;">
 <div class="hr"><p class="c1"></p><p class="c2">WHAT IT MEASURES</p><p class="c3">PASS MARK</p><p class="c4">MEASURED</p><p class="c5"></p></div>
 <div class="rw"><p class="c1">G1</p><p class="c2">personal data removed first</p><p class="c3">0 leaks</p><p class="c4">0 leaks · 888 identifiers removed</p><p class="c5 ok">PASS</p></div>
@@ -36,10 +36,10 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 <div class="rw f"><p class="c1">G5</p><p class="c2">Ragas faithfulness</p><p class="c3">0.90</p><p class="c4">0.814 · precision 0.89 · recall 0.93</p><p class="c5 accent">FAIL</p></div>
 <div class="rw"><p class="c1">G5</p><p class="c2">date-dependent answers</p><p class="c3">5/5</p><p class="c4">5/5</p><p class="c5 ok">PASS</p></div>
 <div class="rw"><p class="c1">G6</p><p class="c2">output check catches bad drafts</p><p class="c3">6/6 planted</p><p class="c4">6/6 · 4 real drafts withheld with reasons</p><p class="c5 ok">PASS</p></div>
-<div class="rw"><p class="c1">G7</p><p class="c2">cost per draft</p><p class="c3">USD 0.02</p><p class="c4">USD 0.00016</p><p class="c5 ok">PASS</p></div>
-<div class="rw f"><p class="c1">G7</p><p class="c2">first reply, p95</p><p class="c3">3 s</p><p class="c4">6.17 s &mdash; pipeline 1.43 s, platform 4.79 s</p><p class="c5 accent">FAIL</p></div>
+<div class="rw"><p class="c1">G7</p><p class="c2">cost per draft</p><p class="c3">USD 0.02</p><p class="c4">USD 0.00050</p><p class="c5 ok">PASS</p></div>
+<div class="rw"><p class="c1">G7</p><p class="c2">first reply, p95</p><p class="c3">3 s</p><p class="c4">2.51 s &mdash; was 6.17 s &middot; vendor 19 s</p><p class="c5 ok">PASS</p></div>
 <div class="rw"><p class="c1">G8</p><p class="c2">cache may not cross a policy change</p><p class="c3">0 stale</p><p class="c4">0 wrong-period · 4/4 reused in window</p><p class="c5 ok">PASS</p></div>
 </div>
 <p class="body" style="margin-top:9pt;width:645pt;">Routing beats the intake dropdown (86.0% &rarr; 90.0%) and fixes 50 of the 56 misroutes a human had to undo, but the interval tops out at 92.5%, so the sample settles it.</p>
-<p class="body" style="width:645pt;">Latency fails for a reason worth separating out. Measured through the deployed endpoint at production pace, the pipeline's own work is <span class="mono">1.43 s</span> at p95 &mdash; inside the mark. The other <span class="mono">4.79 s</span> is the invoke path: API Gateway, Lambda, AgentCore. The slow part is not the thing I built.</p>
+<p class="body" style="width:645pt;">Latency passed once it was split. Three quarters of the wait was platform, not pipeline: the proxy asked AgentCore for a new session every request, so none ever met a warm one. Reusing them alone moved the wall clock <span class="mono">0.01 s</span> &mdash; a warm microVM inherits the last request&rsquo;s rate-limiter slot, so the pipeline lost exactly what the platform saved. Together: <span class="mono">6.17 &rarr; 2.51 s</span>.</p>
 </div></body></html>

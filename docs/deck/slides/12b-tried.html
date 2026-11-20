@@ -1,0 +1,49 @@
+<!DOCTYPE html><html><head><style>html { background:#0B0E14; }
+body { width:720pt; height:405pt; margin:0; padding:0; background:#0B0E14;
+       font-family:Arial, Helvetica, sans-serif; display:flex; }
+.slide { margin:0; padding:34pt 40pt; width:720pt; height:405pt; box-sizing:border-box; }
+h1 { color:#E6E9EF; font-size:30pt; margin:0 0 6pt 0; letter-spacing:-0.4pt; }
+.kicker { color:#E8336D; font-size:10pt; margin:0 0 9pt 0; font-weight:bold;
+          letter-spacing:1.6pt; font-family:'Courier New', monospace; }
+.body { color:#C6CCD8; font-size:11pt; margin:0 0 6pt 0; line-height:1.45; }
+.small { color:#8B95A7; font-size:9.5pt; margin:0; line-height:1.4; }
+.mono { font-family:'Courier New', monospace; }
+.ok { color:#3ECF8E; }
+.accent { color:#E8336D; }
+.two{display:flex;gap:14pt;margin-top:12pt;}
+.two>div{width:312pt;}
+.card{background:#141922;border:1px solid #242C3A;border-radius:6pt;padding:13pt 14pt;height:238pt;box-sizing:border-box;}
+.card.win{border-left:3pt solid #3ECF8E;}
+.card.loss{border-left:3pt solid #E8336D;}
+.ct{color:#E6E9EF;font-size:13pt;font-weight:bold;margin:0 0 2pt 0;}
+.cs{font-size:9pt;margin:0 0 9pt 0;font-family:'Courier New',monospace;letter-spacing:0.8pt;}
+.rw{display:flex;justify-content:space-between;border-bottom:1px solid #1D242F;padding:3.5pt 0;}
+.rw p{margin:0;font-size:9.5pt;font-family:'Courier New',monospace;color:#C6CCD8;}
+.rw p.l{color:#8B95A7;}
+.rw.hi p{color:#E6E9EF;font-weight:bold;}
+</style></head><body><div class="slide">
+<p class="kicker">TWO THINGS TRIED AFTER THE GATES WERE GREEN</p>
+<h1>One worked. One lost to the prompt.</h1>
+<div class="two"><div>
+<div class="card win">
+<p class="ct">Index the escalation tracker</p>
+<p class="cs ok">COVERAGE &mdash; SHIPPED</p>
+<p class="body">The 24 KB articles are all empty stubs, so the ceiling cannot be lifted from the corpus I was given. The tracker is the one place holding written answers: 38 resolved issues with a human root cause, customer names stripped.</p>
+<div class="rw"><p class="l">answered, no person</p><p>43.3% &rarr; <span class="ok">51.7%</span></p></div>
+<div class="rw"><p class="l">of reachable tickets</p><p>50.0% &rarr; <span class="ok">59.6%</span></p></div>
+<div class="rw"><p class="l">&ldquo;no grounds&rdquo; hand-offs</p><p>26 &rarr; 21</p></div>
+<p class="small" style="margin-top:9pt;">Same 60 real tickets, same seed, measured through the deployed endpoint. Citations went from all process documents to <span class="mono">36 of 37</span> tracker keys &mdash; coverage rose, but the basis of the answers shifted wholesale.</p>
+</div>
+</div><div>
+<div class="card loss">
+<p class="ct">Train a router on the labels</p>
+<p class="cs accent">ROUTING &mdash; REJECTED</p>
+<p class="body">G2 sits at 90% against a 95% mark and two prompt rewrites made it worse, so: 1,341 tickets with a human-assigned queue, TF-IDF and a linear SVM, scored on exactly G2&rsquo;s test tickets.</p>
+<div class="rw"><p class="l">majority class</p><p>17.3%</p></div>
+<div class="rw"><p class="l">intake dropdown</p><p>86.0%</p></div>
+<div class="rw hi"><p class="l">Nova Micro prompt</p><p class="ok">90.0%</p></div>
+<div class="rw"><p class="l">trained classifier</p><p class="accent">76.4%</p></div>
+<p class="small" style="margin-top:9pt;">The first run said <span class="mono">100.0%</span>, which is the useful part. Those 1,341 tickets are <span class="mono">402 distinct texts</span>; an id-based split leaves 71.7% of test tickets with their exact wording in training, so the model was a lookup table. Grouped by text, 234 texts must teach nine classes &mdash; and the model&rsquo;s prior about payroll is worth more than that.</p>
+</div>
+</div></div>
+</div></body></html>

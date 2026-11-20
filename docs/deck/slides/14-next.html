@@ -34,9 +34,9 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 <p class="it">No case data leaves the machine. Not in the repository, not in the deployment artifact, not in this deck.</p>
 </div>
 <div class="card open"><p class="hd warn">Open, and worth your attention</p>
-<p class="it"><span style="font-weight:bold;">Faithfulness: 0.814 against a 0.90 mark.</span> Withholding pointer answers moved it from 0.756 and is as far as that fix goes. Retrieval is strong (precision 0.89, recall 0.93), so the gap is generation &mdash; and the drafter is Nova Lite only because Claude is blocked on this account.</p>
-<p class="it"><span style="font-weight:bold;">Claude is blocked on this account.</span> A two-minute console form unlocks it. The pilot runs on Nova meanwhile, which works and costs less.</p>
-<p class="it"><span style="font-weight:bold;">The knowledge base has no bodies.</span> Every KB row is an index entry pointing at Confluence. That ceiling is in the data, not the pipeline.</p>
+<p class="it"><span style="font-weight:bold;">Faithfulness: 0.814 against a 0.90 mark.</span> Withholding pointer answers moved it from 0.756 and that is as far as that fix goes. Retrieval is not the cause: on the golden set it returns the right document <span class="mono">30/30</span> at rank 1 almost every time (MRR 0.97). The gap is generation.</p>
+<p class="it"><span style="font-weight:bold;">The judge is the drafter.</span> Nova Pro writes the answer and Nova Pro grades it. The design calls for a judge a class above the writer; Claude is blocked on this account, so that is not what is running. Treat every judged score here as the weakest number in the deck.</p>
+<p class="it"><span style="font-weight:bold;">The knowledge base has no bodies.</span> Every KB row points at Confluence. Indexing the escalation tracker lifted coverage <span class="mono">43.3% &rarr; 51.7%</span>, but the rest of that ceiling is in the data, not the pipeline.</p>
 </div></div>
 <p class="small" style="margin-top:11pt;">The pilot answers the questions the corpus can answer, refuses the rest out loud, and never moves money. Everything above is reproducible from the repository.</p>
 </div></body></html>
