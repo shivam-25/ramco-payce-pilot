@@ -1,7 +1,7 @@
 # Live presentation prep — 15 minutes
 
 Brief's order: **the database, the data, the pilot, the evals, then the cost.**
-The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 16 slides.
+The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 17 slides.
 
 ---
 
@@ -14,7 +14,7 @@ The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 16 slides.
 | 2:00–3:30 | 3 Pipeline | Ten boxes, each can refuse. **"Rules in code, judgement in the model."** PII, injection, money and dates are decided by code you can test; only drafting is a model. | Don't walk through all ten. Name the principle, point at the strip. |
 | 3:30–5:00 | 4–5 Chunking + retrieval | Chosen by bake-off, not assumption: 4 × 4 strategies, scored with set arithmetic, **no model judge, so the measurement can't flatter itself.** Then the punchline: plain hybrid beat the winner on MRR *and got 3 of 5 dated questions wrong.* The winner is not the top row. | Your strongest methodology moment. Don't rush it. |
 | 5:00–7:30 | 6 Gates | The heart. Eight pass, two don't. Walk G1 → G8, pausing on the two failures. | Don't defend the failures yet — say "I'll come back to both". |
-| 7:30–10:30 | **LIVE DEMO** (or slides 7–11b) | Four runs, below. Slide 11b is a ticket typed live, if you skip the demo. | See risks. |
+| 7:30–10:30 | **LIVE DEMO** (or slides 7–11c) | Four runs, below. Slide 11b is a ticket typed live; 11c is the console streaming, with the impact tiles. | See risks. |
 | 10:30–12:00 | 12 + 12b | Six defects, all mine, four found by a test the code had just passed. Then: two things tried after the gates were green — one worked, one lost. | The trained-router 100% story is your best anecdote. Tell it. |
 | 12:00–13:30 | 13 Cost | USD 6.03 → USD 87/month. **97% of the bill is always-on infrastructure; the models are USD 1.29 of USD 87.** | Don't let them think models are the cost. This surprises people. |
 | 13:30–15:00 | 14 Ledger | What's shipped, what's open, why. End on: answers what it can, refuses out loud, never moves money. | Don't end on an apology either. |
@@ -53,7 +53,7 @@ A good one to invite: *any payroll question with an ID in it*. The reply carries
 **Risks and what to do:**
 - **Use `C-1001` (India) or `C-1003` (UAE).** An id not on file is handed to a person — correct behaviour, but it fires the *unknown customer* rule instead of whichever rule you meant to show.
 - **Warm it first.** Run one throwaway draft ~2 minutes before you start. A cold AgentCore session costs about 5 s; after that it's under 2 s.
-- **If it dies, slides 7–11b are the same scenarios as screenshots.** Switch without comment. Say "I have these captured" — not "sorry, it's broken".
+- **If it dies, slides 7–11c are the same scenarios as screenshots.** Switch without comment. Say "I have these captured" — not "sorry, it's broken".
 - **Don't submit an empty ticket body.** It currently returns a 502 from upstream rather than a clean 400. Minor, real, unfixed.
 
 ---
@@ -153,3 +153,54 @@ than folded behind "How this was decided" — you already compute all of it.
 - Don't read tables aloud. Point and summarise.
 - Don't save the two failures for the end — raise them at the gates slide and promise the explanation. Withholding bad news reads as spin.
 - Don't claim the judge result is fine. It isn't, you know why, and saying so is the strongest thing on that slide.
+
+
+---
+
+## The streaming console, the live feed, and the impact tiles
+
+Added after the deck was first built. A full beat-by-beat script lives in the
+**Demo Runbook** doc; this is the short version for the deck.
+
+**Warm it up first.** Click *Draft a reply* two minutes before you present. A
+cold first request is about 5 s against a warm 2.5 s, and the latency story is
+the one thing a cold demo ruins.
+
+**What the boxes are.** Each pipeline stage emits as it closes, over a
+WebSocket, with its own measured time: `pii gate 0.1ms`, `normalise 0.1ms`,
+`lookup 0ms`, `injection 0ms`, `classify 340ms`. The line to say is that the
+gate, the lookup and the injection screen are under a millisecond *because
+they are code, not models* — only one box on that row costs anything.
+
+Warm: **first stage 1.3 s, first token 2.2 s, complete 2.5 s.** The existing
+2.51 s p95 is a full-reply measure, which is the stricter one.
+
+**The draft streams into a panel marked "Writing — not checked yet"**, not
+into the reply area, because C1–C9 have not run at that point. If a check
+fails the text is withheld and replaced by the reason. Worth saying out loud:
+the agent is staff, not the customer, and approving is still a deliberate
+click.
+
+**The live feed** pushes ten mixed tickets continuously — answered, handed
+over for money, a P1, an injection refused, a product how-to nothing on file
+covers. Run it ten to fifteen seconds and **stop it**: it costs money and it
+keeps moving the numbers you are about to point at.
+
+**Finding one ticket.** Search covers ticket text, customer and the replies.
+The footer counts are the filter — clicking "to you" shows exactly those
+tickets, because the chips and the tally are computed from the same test.
+Sorting: as they arrived, by priority, slowest first, most expensive first.
+
+**Priority is a field, not a feeling.** A P1 routes to a person before any
+model runs; the same text sent as P3 comes back drafted. Say that deliberately
+— it is the honest version of "urgent" handling, and someone will ask.
+
+**The impact tiles** (*Show impact*): agent time returned, share handled
+without a person, where the queue went, time per ticket against the 3 s gate.
+The time figure is derived, not assumed — 42 FTE against 15,000 tickets is
+26.9 minutes a ticket, less 4 minutes to read and approve, so the tile claims
+**22.9 minutes per drafted reply** and says so on its face.
+
+If the socket cannot open, the console silently falls back to the buffered
+endpoint. Answers still arrive; the boxes just do not light up. Nothing to
+announce unless someone noticed.
