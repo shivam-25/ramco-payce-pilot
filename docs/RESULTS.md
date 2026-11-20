@@ -594,30 +594,72 @@ the pilot exists to prevent, so the ceiling stays until Confluence is
 ingested for real.
 
 The escalation tracker is the one place in the export holding written
-answers: 38 resolved issues with a human-written root cause. Indexed as a
-`known_issue` source, measured by replaying 60 real tickets from the export
-through the deployed endpoint, same seed both times:
+answers: 38 resolved issues with a human-written root cause. Indexing it
+looked like the way to lift the ceiling, and the first measurement said it
+was: coverage rose from 43.3% to 51.7%.
 
-| | without known issues | with |
+**That number was wrong, and chasing it is the most useful thing in this
+document.** Replaying the same 60 real tickets through the deployed endpoint,
+same seed every time, as each problem was found and fixed:
+
+| configuration | answered without a person | of the 52 a corpus can reach |
 |---|---|---|
-| answered without a person | 26/60 — 43.3% | **31/60 — 51.7%** |
-| of the tickets a corpus can reach | 26/52 — 50.0% | **31/52 — 59.6%** |
-| handed over for "no grounds" | 26 | 21 |
+| no tracker corpus | 26/60 — 43.3% | 50.0% |
+| tracker indexed whole | 31/60 — **51.7%** | 59.6% |
+| tracker indexed whole, after the tone fix | 4/60 — 6.7% | 7.5% |
+| 2 usable notes, tone fix | 24/60 — 40.0% | 46.2% |
+| **2 usable notes, tone fix, capability rule** | **15/60 — 25.0%** | **28.8%** |
 
-Five more tickets answered. Eight of the 60 go to a person for money, an
-injection attempt or a P1 and no corpus change can move them, which is why
-the second row exists.
+The honest number is the last row. Everything above it was bought with
+sentences the corpus does not support, and it took three separate findings to
+see that.
 
-**The result worth arguing with is the citation mix.** Before, process
-documents supplied every citation — the payroll-week runbook, the SLA
-excerpt, the triage SOP. After, 36 of 37 citations are Jira keys. The new
-source is 38 of 84 chunks in the Indian corpus and it is winning almost
-every top-5 slot. That may well be right: a real support ticket is much more
-often a product fault than a question about payroll week, and the tracker is
-written in the same vocabulary as the tickets. But "the new source answers
-everything" is what crowding out looks like too, and the honest statement is
-that coverage rose while the basis of the answers shifted wholesale. What
-settles it is a faithfulness run on the known-issue slice, which is not done.
+**First, most of the tracker says nothing a customer can use.** Of the 38
+resolved notes, 36 are an engineer's verdict on our own process: "Could not
+reproduce" (9), "Fixed in next release" (10), "Engine already updated;
+support content out of date" (9), "Config issue on tenant" (6). Two carry a
+real cause. Indexed whole, they gave the model 36 new ways to sound
+informative while saying nothing, and that is where the +8.4 points came
+from. Replacing the unusable ones with a chunk reading "a support engineer
+must take this ticket" was worse still — 6.7%, because those chunks outranked
+the process documents and turned the corpus into an escalation magnet. They
+are now not indexed at all.
+
+**Second, the prompt was asking for the leak.** It said to tell the customer
+the cause is known and a fix is in progress. That is how "attempts to
+reproduce the issue have been unsuccessful" and "support content may be out
+of date" reached a customer-facing draft, and it is why one G5 row scored
+0.0 for an unsupported claim. Tracker notes are now evidence, not copy, and a
+tracker note may never itself cause a hand-off: answer from whatever passage
+does answer, and leave the tracker out of the reply.
+
+**Third, and worst, the pilot was inventing product behaviour.** Asked "can
+we download all payslips for August as one zip?", it answered:
+
+> The payroll system does not support exporting all payslips for a month as a
+> single zip file [2]. You must download each payslip individually [2].
+
+Confident, cited, and marked Ready for a human to approve. Source [2] is the
+payroll-week runbook, which says nothing about exports. Nothing in this
+corpus does — it holds statutes, runbooks, an SLA excerpt and a triage SOP,
+not a feature list. The same question in English escalated correctly on the
+next run while the Hindi version answered, so this was non-determinism at the
+dangerous end, not a reproducible bug I could have caught by reading code.
+
+The prompt now forbids any claim about what the product can or cannot do
+unless a passage says so in those terms. That single rule costs **15 points
+of coverage**, 40.0% to 25.0%, and every one of the 9 tickets it withheld is
+a product how-to question: five asking to export payslips together, two about
+year-end carry-forward balances, one about adding a taxable salary component,
+one about a bulk-upload template. All nine were previously answered by
+guessing. None of them is answerable from this corpus.
+
+So the ceiling is lower than the first measurement claimed, and the gap
+between 43.3% and 25.0% measures how much confident guessing the coverage
+metric was counting as success. The remaining 15 answers still lean on the
+tracker — 12 of 15 citations are tracker keys from just two notes — and a
+faithfulness run on that slice is still not done, so I would hold even 25.0%
+loosely.
 
 ### Two leaks it introduced, and a deploy that hid the fix
 
@@ -644,6 +686,16 @@ price of the latency win: a warm AgentCore session keeps serving the runtime
 version it opened on, so the corrected check was live and not running.
 `deploy_runtime.sh` now recycles the proxy's execution environments, which
 drops their sessions with them.
+
+That was not the whole of it. Fixing the tone leak appeared to do nothing for
+a second time, and the cause was in the deploy script itself: it ran
+`test -f` on `dist/ramco-runtime.zip` and, finding a zip from an earlier
+session, shipped that. Runtime versions 23 and 24 contained none of the day's
+changes. I only caught it by reading `outputcheck.py` back out of the zip and
+finding the new check absent — before that I had watched a model-variance
+blip on v24 and recorded it as my fix working. The script now repackages from
+the working tree on every run, and the lesson is the cheap one: when a deploy
+seems not to take, verify the artifact rather than the behaviour.
 
 ## Routing: the trained classifier is worse, and the data says why
 
