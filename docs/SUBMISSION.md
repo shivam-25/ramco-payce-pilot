@@ -4,6 +4,9 @@
 
 🧭 **Approach.** Rules in code, judgement in the model: PII, injection, money and dates are decided by code that can be tested, and only the drafting is left to a model. Every box can refuse. Each gate is a number with a pass mark, run on the real export rather than on examples I wrote, and the two gates that fail are reported as failures with the cause measured.
 
+
+📝 **Corrected 20 Nov.** An earlier version of this submission reported coverage of **51.7%**. Testing the console by hand afterwards caught the pilot stating product behaviour that no passage supports — *"the payroll system does not support exporting all payslips as a single zip file"*, cited to a runbook that never says so. With that forbidden, and tracker notes carrying nothing a customer can use no longer indexed, the honest figure is **25.0%**. The full ladder and the three findings behind it are in [RESULTS.md](https://github.com/shivam-25/ramco-payce-pilot/blob/master/docs/RESULTS.md).
+
 ---
 
 ### 1. Architecture and what changed from my A0
