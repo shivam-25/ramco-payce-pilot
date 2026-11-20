@@ -212,3 +212,11 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
   .scorebar { position: static; margin: 20px 0 0; padding: 12px 0 0; }
   .tallies .sp { margin-left: 0; }
 }
+
+/* Shown only while the feed runs and you have stepped off it, so that an
+   arriving queue cannot silently steal what you are reading. */
+.held { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+        margin: 14px 0 0; padding: 8px 12px; font-size: 13px;
+        color: var(--dim); background: var(--card);
+        border: 1px solid var(--line); border-left: 2px solid var(--warn, #F2B134);
+        border-radius: 6px; }

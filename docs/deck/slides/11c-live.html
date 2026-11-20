@@ -1,0 +1,26 @@
+<!DOCTYPE html><html><head><style>html { background:#0B0E14; }
+body { width:720pt; height:405pt; margin:0; padding:0; background:#0B0E14;
+       font-family:Arial, Helvetica, sans-serif; display:flex; }
+.slide { margin:0; padding:26pt 34pt; width:720pt; height:405pt; box-sizing:border-box; }
+h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
+.kicker { color:#E8336D; font-size:10pt; margin:0 0 8pt 0; font-weight:bold;
+          letter-spacing:1.6pt; font-family:'Courier New', monospace; }
+.sub { color:#8B95A7; font-size:11pt; margin:0 0 11pt 0; line-height:1.4; }
+.small { color:#8B95A7; font-size:9pt; margin:5pt 0 0 0; line-height:1.35; }
+.mono { font-family:'Courier New', monospace; }
+.ok { color:#3ECF8E; }
+.accent { color:#E8336D; }
+.row { display:flex; gap:16pt; }
+.col { width:300pt; }
+img { width:300pt; height:243pt; border:1px solid #242C3A; border-radius:5pt; }
+</style></head><body><div class="slide">
+<p class="kicker">THE CONSOLE, WHILE IT IS WORKING</p>
+<h2>Each box lights up as it closes. The desk never goes quiet.</h2>
+<p class="sub">A WebSocket carries the pipeline&rsquo;s own events to the browser, so the wait is legible instead of a spinner. First stage <span class="mono ok">1.3s</span>, first token <span class="mono ok">2.2s</span>, complete <span class="mono ok">2.5s</span>.</p>
+<div class="row">
+<div class="col"><img src="11c-live-stages.jpg">
+<p class="small">Per-box timings are measured, not decorative: <span class="mono">classify 340ms</span> is the only stage that costs anything. The gate, the lookup and the injection screen are <span class="mono">&lt;1ms</span> &mdash; they are code, not a model.</p></div>
+<div class="col"><img src="11c-feed-tally.jpg">
+<p class="small">The feed keeps arriving. Counts move with every ticket: <span class="mono">22 handled</span>, <span class="mono ok">13 drafted</span>, <span class="mono">9 to you</span>, <span class="mono accent">2 refused</span> &mdash; and the draft is held in a panel marked <span class="mono">not checked yet</span> until C1&ndash;C9 pass.</p></div>
+</div>
+</div></body></html>

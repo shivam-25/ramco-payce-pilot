@@ -49,6 +49,17 @@ export default function Console() {
   const [writing, setWriting] = useState(false);
   const [feeding, setFeeding] = useState(false);
   const feedRef = useRef(false);
+  // The feed follows the newest ticket until you pick one yourself, and then
+  // it stops and leaves you on it. Without this the selection is yanked away
+  // every couple of seconds and an arriving queue is impossible to read --
+  // which is the opposite of the point.
+  const [follow, setFollow] = useState(true);
+  const followRef = useRef(true);
+  const choose = (key: string) => {
+    setSel(key);
+    if (feedRef.current) { followRef.current = false; setFollow(false); }
+  };
+  const resume = () => { followRef.current = true; setFollow(true); };
 
   const patch = (key: string, p: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)));
@@ -109,6 +120,7 @@ export default function Console() {
   async function toggleFeed() {
     if (feedRef.current) { feedRef.current = false; setFeeding(false); return; }
     feedRef.current = true; setFeeding(true);
+    followRef.current = true; setFollow(true);
     let n = 0;
     while (feedRef.current) {
       const d = FEED[n % FEED.length];
@@ -118,7 +130,7 @@ export default function Console() {
                          customer: d.customer, asOf: d.asOf, note: d.note,
                          state: "running" };
       setRows((rs) => [...rs, row]);
-      setSel(key);
+      if (followRef.current) setSel(key);
       try {
         const result = await runOne(row, false);
         patch(key, { state: result.error ? "failed" : "done", result,
@@ -219,13 +231,20 @@ export default function Console() {
         </p>
       )}
 
+      {feeding && !follow && (
+        <p className="held">
+          Tickets are still arriving &mdash; you are holding this one.
+          <button className="link" onClick={resume}>Follow the newest again</button>
+        </p>
+      )}
+
       <div className="split">
         <nav className="list">
           <p className="rail">Queue · {rows.length}</p>
           {rows.map((r) => {
             const s = r.result ? status(r.result) : null;
             return (
-              <button key={r.key} onClick={() => setSel(r.key)}
+              <button key={r.key} onClick={() => choose(r.key)}
                       className={`item ${sel === r.key ? "on" : ""}`}>
                 <span className={`dot ${r.state === "running" ? "run" : s ? s.tone : "idle"}`} />
                 <span className="itext">
