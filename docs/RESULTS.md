@@ -583,3 +583,99 @@ note in `config.py` previously warned against in as many words. G5's
 faithfulness number is self-graded from here and should be read as
 indicative rather than as a gate. When the Claude use-case form clears, move
 the judge up a class first; that restores the gate and costs nothing else.
+
+## Raising the coverage ceiling, and the two things it tried to leak
+
+The 24 KB articles are the limit on how much this pilot can answer, and they
+cannot be fixed from this export. Every one has an empty body and the excerpt
+"See full article in Confluence space SUP-KB." There is nothing to ingest.
+Writing the bodies would be inventing payroll guidance, which is the failure
+the pilot exists to prevent, so the ceiling stays until Confluence is
+ingested for real.
+
+The escalation tracker is the one place in the export holding written
+answers: 38 resolved issues with a human-written root cause. Indexed as a
+`known_issue` source, measured by replaying 60 real tickets from the export
+through the deployed endpoint, same seed both times:
+
+| | without known issues | with |
+|---|---|---|
+| answered without a person | 26/60 — 43.3% | **31/60 — 51.7%** |
+| of the tickets a corpus can reach | 26/52 — 50.0% | **31/52 — 59.6%** |
+| handed over for "no grounds" | 26 | 21 |
+
+Five more tickets answered. Eight of the 60 go to a person for money, an
+injection attempt or a P1 and no corpus change can move them, which is why
+the second row exists.
+
+**The result worth arguing with is the citation mix.** Before, process
+documents supplied every citation — the payroll-week runbook, the SLA
+excerpt, the triage SOP. After, 36 of 37 citations are Jira keys. The new
+source is 38 of 84 chunks in the Indian corpus and it is winning almost
+every top-5 slot. That may well be right: a real support ticket is much more
+often a product fault than a question about payroll week, and the tracker is
+written in the same vocabulary as the tickets. But "the new source answers
+everything" is what crowding out looks like too, and the honest statement is
+that coverage rose while the basis of the answers shifted wholesale. What
+settles it is a faithfulness run on the known-issue slice, which is not done.
+
+### Two leaks it introduced, and a deploy that hid the fix
+
+Indexing internal engineering notes gave the pilot new ways to say something
+it should not.
+
+The tracker key: *"This is a duplicate of PNJ-4412"* is true, cites
+correctly, passes every other check, and tells a customer how our issue
+tracker is numbered. Worse, PNJ-4412's note ends *"Fix in 2.7.3, rollout
+pending customer UAT"*, and the first draft from it told the customer exactly
+that — a release commitment the support desk never agreed to make. My rule of
+only indexing resolved issues was supposed to prevent this and did not: the
+issue is closed and its note is still forward-looking.
+
+So C8 rejects a draft carrying an internal tracker id or a promise about an
+unshipped fix, and the prompt asks for "a fix is in progress" — no version,
+no date. The first C8 banned that sentence too, matching "fix is in" without
+requiring a digit, so the check rejected the exact wording the system had
+been told to produce. It now requires the specifics that make a promise, and
+is tested in both directions.
+
+Deploying the fix then appeared not to work, which turned out to be the
+price of the latency win: a warm AgentCore session keeps serving the runtime
+version it opened on, so the corrected check was live and not running.
+`deploy_runtime.sh` now recycles the proxy's execution environments, which
+drops their sessions with them.
+
+## Routing: the trained classifier is worse, and the data says why
+
+G2 sits at 90.0% against a 95% target, and two prompt rewrites made it worse.
+The obvious next move is to stop prompting and train on the 1,341 tickets
+whose queue a human assigned. Measured on exactly the tickets G2 scores —
+same seed, same sampler, asserted identical — a TF-IDF word-and-char model
+with a linear SVM gets:
+
+| | accuracy on G2's 399 test tickets |
+|---|---|
+| majority class | 17.3% |
+| intake dropdown, today | 86.0% |
+| **Nova Micro prompt (G2)** | **90.0%** |
+| trained classifier | 76.4% |
+
+It loses, and not narrowly — it is worse than the dropdown it was meant to
+replace.
+
+The first run said 100.0%, which is the useful part. A support export repeats
+itself: these 1,341 tickets contain **402 distinct texts**, and an id-based
+split leaves 71.7% of the test tickets with their exact wording also in
+training. The model was a lookup table reporting that it can remember 402
+strings. Grouping by text so a wording lands wholly in train or wholly in
+test gives the 76.4% above, and leaves just **234 distinct texts** to learn
+nine classes from. That is the answer: there is no labelled data here, there
+are 402 labelled sentences wearing 1,341 hats, and the language model's prior
+about payroll is worth more than 234 examples.
+
+It also puts a caveat on G2's own number. Its 95% confidence interval
+(86.6–92.5%) assumes independent samples, and 399 tickets drawn from 402
+distinct texts are not independent. The point estimate is a fair measure of
+accuracy over the ticket *stream*, which is what production sees; the
+interval is narrower than the evidence supports.
+
