@@ -488,14 +488,31 @@ drafted inside the VPC through a new runtime eval path and scored outside it:
 | **must_contain** | 4/5 | **5/5** |
 | must_not_contain | 2/2 | 2/2 |
 | **must_abstain** | 4/5 | **5/5** |
-| p50 latency | 7.40s | 7.40s |
-| p95 latency | 7.73s | 7.88s |
+| ~~p50 latency~~ | ~~7.40s~~ | ~~7.40s~~ |
+| ~~p95 latency~~ | ~~7.73s~~ | ~~7.88s~~ |
 | cost per question | USD 0.000067 | USD 0.000537 |
 | faithfulness (judged) | 0.699 | 0.817 |
 
 `must_contain` and `must_abstain` are string checks against the golden set.
 No model grades them, and they are the reason this change was made: the
 judged numbers alone would not have been enough.
+
+**The two latency rows are struck through because they measure nothing.** I
+read the matching 7.40s as "the upgrade is free on speed". It is not a speed
+at all. Neither Nova Lite nor Nova Pro appears in the rate limiter's RPM
+table, so both fell through to its default of 10 requests a minute, and
+60 / (10 × 0.8) is 7.5 seconds. Both arms were reporting the limiter's own
+sleep, and they agreed to two decimal places because they shared a default
+rather than because the models are comparably fast.
+
+What should have caught it is the agreement itself: two models an order of
+magnitude apart in price, matching to 0.01s on a wall-clock, is not a
+finding, it is an artefact. A model id missing from a dict became a published
+number. The limiter now prints a warning the first time it falls back to the
+default, and no longer runs at all outside a sweep.
+
+How the two drafters' latencies actually compare is unmeasured. It did not
+move the decision, which rests on the two string checks.
 
 **Three honest caveats.**
 

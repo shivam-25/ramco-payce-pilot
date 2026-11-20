@@ -31,11 +31,18 @@ AWS_REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
 # against the brief's cap of USD 4.50, about a hundred thousand times of head
 # room. Drafted both arms over the 35-question golden set, same corpus, same
 # retrieval, same questions. Pro answered the same 29 and withheld the same 3,
-# took the same time (p50 7.40s both, p95 7.73 -> 7.88), cost eight times more
-# -- USD 0.000537 a question, still four orders of magnitude under the cap --
-# and got more right: must_contain 5/5 against 4/5, must_abstain 5/5 against
-# 4/5. Those two are string checks against the golden set, so no model graded
-# them.
+# cost eight times more -- USD 0.000537 a question, still four orders of
+# magnitude under the cap -- and got more right: must_contain 5/5 against 4/5,
+# must_abstain 5/5 against 4/5. Those two are string checks against the golden
+# set, so no model graded them, and they are what the choice rests on.
+#
+# That run also reported "took the same time, p50 7.40s both", and that part
+# was wrong. Neither model appears in pilot.bedrock's RPM table, so both fell
+# to its default of 10 rpm, and 60 / (10 * 0.8) is 7.5 s. The figure was the
+# rate limiter's own sleep; it matched across the arms because the arms shared
+# a default, not because the models are equally fast. How their latencies
+# actually compare is unmeasured. The limiter no longer runs outside a sweep,
+# so a rerun would measure the models rather than the quota.
 #
 # Nova Pro also judges, which is now the same model drafting and grading. That
 # is the thing the previous note here warned against, and it is a real cost of

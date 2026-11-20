@@ -185,6 +185,19 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     res.sla_hours = sla(ticket.tier, ticket.priority)
 
     if decision.route is Route.HUMAN:
+        # This ticket never uses the warmed vector, but the warm-up still
+        # charged the meter for computing it, and reading meter.usd while that
+        # thread is mid-flight makes the reported cost a coin toss. Join
+        # before pricing.
+        #
+        # It costs very little: the warm-up started before the classifier,
+        # which is the slower of the two, so by the time the router has
+        # decided the embedding has almost always already landed. The timeout
+        # is there so a hung Bedrock call cannot hold a human-routed ticket --
+        # if it fires, the cost is under-reported by one embedding and the
+        # ticket still goes to the queue.
+        if warm is not None:
+            warm.join(timeout=5)
         res.timings_ms = {k: round(v, 1) for k, v in t.items()}
         res.usd = meter.usd
         return res
