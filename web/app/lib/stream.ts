@@ -38,13 +38,18 @@ function socket(url: string): Promise<WebSocket> {
 export function streamTicket(url: string, key: string, row: Sent,
                              useCache: boolean, h: Handlers): Promise<Result> {
   return socket(url).then((ws) => new Promise<Result>((resolve, reject) => {
-    // Frames carry no request id, so two tickets in flight on one socket
-    // would interleave and neither caller could tell whose token was whose.
-    // The console serialises its runs; this listener is removed on the
-    // terminal frame so the next run starts clean.
+    // Every frame carries the id we sent, and we ignore the ones that are
+    // not ours. This file previously claimed "the console serialises its
+    // runs" and it does not -- "Draft all replies" runs four at a time --
+    // so replies landed on whichever row happened to be listening. A money
+    // ticket showed another ticket's drafted answer and the not-in-corpus
+    // one showed an injection refusal: wrong, and plausible enough to be
+    // believed.
+    const rid = `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     const onMsg = (e: MessageEvent) => {
       let ev: Record<string, unknown>;
       try { ev = JSON.parse(String(e.data)); } catch { return; }
+      if (ev.rid !== rid) return;
       switch (ev.event) {
         case "stage":
           h.onStage({ box: String(ev.box ?? ""),
@@ -65,7 +70,7 @@ export function streamTicket(url: string, key: string, row: Sent,
     };
     ws.addEventListener("message", onMsg);
     ws.send(JSON.stringify({
-      key, subject: row.subject, body: row.body,
+      key, rid, subject: row.subject, body: row.body,
       customer_id: row.customer, as_of: row.asOf, use_cache: useCache,
     }));
   }));

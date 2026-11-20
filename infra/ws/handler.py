@@ -93,10 +93,23 @@ def handler(event, _context):
         "apigatewaymanagementapi",
         endpoint_url=f"https://{ctx['domainName']}/{ctx['stage']}")
 
+    # One socket carries every ticket on the page, so a frame that does not
+    # say which ticket it belongs to is ambiguous the moment two run at
+    # once. "Draft all replies" runs four, and without this the browser
+    # delivered whichever reply arrived next to whichever row was waiting:
+    # a money ticket showed another ticket's drafted answer, and the
+    # not-in-corpus one showed the injection refusal. Both wrong, both
+    # plausible-looking, which is the dangerous kind.
+    #
+    # The id is the caller's and is echoed, never interpreted.
+    rid = None
+
     def push(obj) -> bool:
         """True while the browser is still there. A viewer who closes the tab
         mid-run is normal, not an error, and must not look like one."""
         try:
+            if rid is not None:
+                obj = {**obj, "rid": rid}
             api.post_to_connection(ConnectionId=conn,
                                    Data=json.dumps(obj).encode())
             return True
@@ -117,6 +130,11 @@ def handler(event, _context):
     # through this socket and start an eval sweep on the account's budget.
     allowed = {"subject", "body", "customer_id", "as_of", "use_cache"}
     clean = {k: v for k, v in payload.items() if k in allowed}
+    # Read after auth so an unauthenticated caller cannot have its id
+    # reflected, and bounded so it cannot be used to pad frames.
+    got = payload.get("rid")
+    if isinstance(got, str) and got:
+        rid = got[:64]
     clean["stream"] = True
 
     try:
