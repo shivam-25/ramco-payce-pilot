@@ -98,6 +98,50 @@ A good one to invite: *any payroll question with an ID in it*. The reply carries
 
 ---
 
+## 3b. The other submission on the thread, and what it teaches
+
+One other pilot is posted (Kamal Jain, GCP). Read it before you present —
+not to compete, but because it is strong in places you are thin, and thin in
+places you are strong. Both are worth knowing in the room.
+
+**Where he is genuinely ahead. Say so if it comes up; do not pretend.**
+
+| He has | You do not | Why it matters |
+|---|---|---|
+| A PII **vault** — reversible tokens, only the send step restores real values | You mask irreversibly | He can write "your account ending 4412". You structurally cannot, which is safer and less useful. The honest line: a vault is the right next rung, and it moves the risk from the gate to the send step. |
+| **Read-only, customer-scoped tools** for live status | Pure retrieval over documents | This is the real reason some of your 25% is unreachable. "Where is my refund" is a lookup, not a document. Worth naming as your top next build. |
+| **Two regions actually deployed**, compute co-located with data | One region | You have an account constraint (SCP denies the rest), documented and verifiable. State it as a constraint, not a design choice — you already do. |
+| **Observability**: per-stage traces, PII-free structured logs, SLO dashboard, a PII-leak alarm | Gates in CI, no live telemetry | Your gates prove it worked on the export. His tell him it is working now. Fair gap; say it is the next rung after the vault. |
+| **Measured** per-call cost into BigQuery | Priced from the AWS price list | He found his modelled $0.02/draft was ~200× conservative. You model too — though your $0.00050 is itself measured on the deployed pipeline, so say that. |
+| **Streaming first token** | Full reply, then render | His p95 2.76 s is time-to-**first-token**. Your 2.51 s is the **whole reply**. That is the stricter measure and you should say so plainly, because the two numbers look alike and are not. |
+
+**Where your method is the more careful one.** Offer these only if asked to
+compare; they are observations about measurement, not about him.
+
+- His faithfulness is **1.00** on **15 curated questions**, scored by his own
+  sentence-support check. Yours is **0.789** on **35 golden questions** under
+  Ragas, and you name the judge-independence flaw yourself. A 1.00 on a
+  self-authored metric and a 0.789 on a standard one are not comparable, and
+  the lower number is the better-evidenced one.
+- His routing is **0.96 on 300 held-out tickets**. You measured that these
+  1,341 tickets hold only **402 distinct texts**, so an id-based split leaks
+  71.7% of test wording into training. That is a property of the shared data
+  room, not of his code — but it means a held-out split on ticket id flatters
+  any model, and it is why your own first run said 100%.
+- His deflection, **45%**, is modelled and carries an $18k/month case and a
+  0.67-month payback. Yours, **25.0%**, is measured by replaying real tickets
+  through the deployed endpoint. He says it is an estimate; the number just
+  sits next to measured ones.
+- Today's per-ticket baseline differs: his **$6.46** (incl. SLA credits,
+  3-month average), yours **$6.03**. Same finance sheet, different method. If
+  anyone notices, that is the answer — know it before they ask.
+
+**The two UI ideas worth taking.** Streaming is the big one: your console
+shows "Reading the rules…" for several seconds, then everything at once.
+Streaming the draft as it writes would change perceived speed more than any
+latency work left. Second, show the pipeline stages advancing live rather
+than folded behind "How this was decided" — you already compute all of it.
+
 ## 4. Three things to make sure you say
 
 1. **"Rules in code, judgement in the model."** The whole design in five words.

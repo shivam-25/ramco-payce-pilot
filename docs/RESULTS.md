@@ -207,9 +207,17 @@ Priced from the AWS Price List API for `ap-southeast-2`, published
 | | |
 |---|---|
 | Today, per ticket | USD 6.03 |
-| Pilot, per ticket answered | USD 0.000086 |
+| Pilot, one drafted reply (G7, measured) | USD 0.00050 |
+| Pilot, model spend per ticket received | USD 0.000086 |
 | Pilot, monthly all-in at 15,000 tickets | ≈ USD 87 |
 | Of which models | USD 1.29 (1.5%) |
+
+The two per-ticket figures measure different things and are easy to confuse.
+USD 0.00050 is what one drafted reply costs, which is the number G7 gates.
+USD 0.000086 is the month's model spend divided across every ticket that
+arrives — USD 1.29 ÷ 15,000 — so it is lower because most tickets never
+reach a draft: they are refused, deduplicated, served from cache or handed
+to a person, and none of those calls a drafting model.
 
 Ninety-seven percent of the run cost is always-on infrastructure. Doubling
 ticket volume changes the bill by about a dollar.
