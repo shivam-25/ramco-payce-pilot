@@ -517,6 +517,7 @@ function Reply({ row, acted, onAct, onCompare }: {
   const sources = r.sources || [];
   const parts = withMarkers(r.draft || "");
   const pii = Object.entries(r.pii_counts || {});
+  const [saw, setSaw] = useState(false);
   const bad = stale(r, row.asOf);
 
   return (
@@ -547,11 +548,29 @@ function Reply({ row, acted, onAct, onCompare }: {
       )}
 
       {pii.length > 0 && (
-        <p className="pii">
-          Personal details were hidden before this was drafted: {pii.map(([k, v]) =>
-            `${v} ${piiName(k, v)}`).join(", ")}. The customer still sees them
-          on the ticket; the draft was written without them.
-        </p>
+        <div className="pii">
+          <p className="piitop">
+            Personal details were hidden before this was drafted: {pii.map(([k, v]) =>
+              `${v} ${piiName(k, v)}`).join(", ")}. The customer still sees them
+            on the ticket; the draft was written without them.
+            {r.masked_text && (
+              <button className="lnk" onClick={() => setSaw((v) => !v)}>
+                {saw ? "Hide what the model saw" : "Show what the model saw"}
+              </button>
+            )}
+          </p>
+          {saw && r.masked_text && (
+            <div className="saw">
+              <p className="sawhead">EXACTLY WHAT WAS SENT TO THE MODEL</p>
+              <p className="sawtext">
+                {r.masked_text.split(/(\[REDACTED:[A-Z_]+(?::\d+)?\])/g).map((part, i) =>
+                  /^\[REDACTED:/.test(part)
+                    ? <mark key={i} className="red">{part}</mark>
+                    : <span key={i}>{part}</span>)}
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="act">

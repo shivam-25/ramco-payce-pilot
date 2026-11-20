@@ -339,3 +339,18 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
           color: var(--dim); background: transparent;
           border: 1px solid var(--line); cursor: pointer; }
 .impact:hover { color: var(--fg); border-color: var(--line2); }
+
+/* "Show what the model saw" — the gate's claim, made checkable.
+   A sentence saying personal data was removed is worth less than the text
+   with the holes in it, which is why this is one click from the reply. */
+.piitop { margin: 0; }
+.lnk { background: none; border: 0; padding: 0 0 0 6px; cursor: pointer;
+       color: var(--accent); font: inherit; text-decoration: underline; }
+.saw { margin-top: 9px; border: 1px solid var(--line); border-radius: 7px;
+       padding: 10px 12px; background: var(--panel); }
+.sawhead { margin: 0 0 6px; font-family: var(--mono); font-size: 10px;
+           letter-spacing: 1px; color: var(--dim); }
+.sawtext { margin: 0; font-family: var(--mono); font-size: 12px;
+           line-height: 1.6; white-space: pre-wrap; color: var(--ink); }
+.red { background: rgba(232, 51, 109, 0.16); color: var(--accent);
+       border-radius: 3px; padding: 1px 4px; font-weight: 600; }

@@ -16,7 +16,7 @@ export type Result = {
   // allowed the code reading it to be wrong.
   output_check: { passed?: boolean; failures?: string[];
                   detail?: Record<string, unknown> };
-  pii_counts: Record<string, number>; cache_hit: boolean;
+  pii_counts: Record<string, number>; masked_text?: string; cache_hit: boolean;
   timings_ms: Record<string, number>; usd: number;
   sla_hours: [number, number] | null;
   error?: string;

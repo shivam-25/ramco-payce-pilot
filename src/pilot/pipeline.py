@@ -54,6 +54,12 @@ class Result:
     needs_approval: bool = False
     output_check: dict = field(default_factory=dict)
     pii_counts: dict = field(default_factory=dict)
+    # Exactly the text the models were given, after both the regex gate and
+    # the managed screen. Safe to return and safe to show: if anything in it
+    # were personal data the gate would have failed. The console displays it
+    # beside what the customer wrote, because a claim that personal data was
+    # removed is worth less than being able to see what was left.
+    masked_text: str = ""
     cache_hit: bool = False
     timings_ms: dict = field(default_factory=dict)
     usd: float = 0.0
@@ -170,6 +176,9 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
 
     # ---- box 2: normalise --------------------------------------------
     t0 = clock()
+    # Captured here, assigned once `res` exists: this is the text as it
+    # stands after BOTH screens, which is what the models are handed.
+    shown_masked = downstream_text(masked_raw)
     ticket = normalise(masked_raw)
     t["normalise"] = (clock() - t0) * 1000
     emit("stage", box="normalise", ms=round(t["normalise"], 1),
@@ -214,7 +223,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
 
     res = Result(ticket_id=ticket.ticket_id, route="", reason="",
                  region=ticket.region, tier=ticket.tier,
-                 priority=ticket.priority, pii_counts=red.counts)
+                 priority=ticket.priority, pii_counts=red.counts,
+                 masked_text=shown_masked)
 
     # ---- injection screen: before any model call ----------------------
     t0 = clock()
