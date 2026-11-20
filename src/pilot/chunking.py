@@ -248,6 +248,54 @@ def _d(value):
     return _date(int(y), int(m), int(d))
 
 
+# Internal triage verdicts. Each of these is a true statement about the
+# tracker and useless, or worse than useless, in a reply to the customer who
+# raised the ticket:
+#
+#   "Could not reproduce."                      -> we did not find your bug
+#   "Fixed in next release."                    -> a date we must not promise
+#   "Engine already updated; support content
+#    out of date."                              -> our documentation is wrong
+#   "Config issue on tenant."                   -> a cause needing account work
+#   "Duplicate of PNJ-4412 ..."                 -> our issue numbering
+#
+# A note matching any of these is kept as a signal that the problem is known,
+# and withheld as an answer.
+_INTERNAL_NOTE = re.compile(
+    r"(?:could\s+not|cannot|can't|unable\s+to)\s+reprod"
+    r"|not\s+reproducible"
+    r"|works?\s+as\s+(?:designed|intended)"
+    r"|fixed\s+in\s+(?:the\s+)?(?:next|a\s+future|upcoming)\s+release"
+    r"|support\s+content\s+(?:is\s+)?out\s+of\s+date"
+    r"|support\s+content\s+(?:is\s+)?stale"
+    r"|config(?:uration)?\s+issue\s+on\s+tenant"
+    # Any reference to another tracker item, however phrased ("Duplicate of
+    # PNJ-4412", "Related to PNJ-4412"). Even when such a note also carries a
+    # real cause, it opens by talking about our issue numbering, and C8 would
+    # strip the id and leave a dangling "related to".
+    r"|\b[A-Z]{2,4}-\d{2,}\b"
+    r"|by\s+design"
+    r"|won'?t\s+fix"
+    r"|no\s+action\s+(?:required|needed)",
+    re.I)
+
+
+def customer_usable(note: str) -> bool:
+    """Is this resolution note something a customer can be told and act on?
+
+    True means the note explains what happened or what to do. False means it
+    is an engineer's verdict about the tracker -- still useful for spotting
+    that an issue is known, never useful as the body of a reply.
+    """
+    note = (note or "").strip()
+    if len(note) < 25:
+        # "Could not reproduce." and its friends are all short. A genuine
+        # root cause in this export runs to a sentence or more. The length
+        # floor is a cheap guard for phrasings the pattern has not met yet.
+        return False
+    return not _INTERNAL_NOTE.search(note)
+
+
 def known_issue_chunks(strategy: str, issues: list[dict] | None) -> list[Chunk]:
     """Known-issue chunks on their own, with no disk access.
 
@@ -260,6 +308,32 @@ def known_issue_chunks(strategy: str, issues: list[dict] | None) -> list[Chunk]:
     out: list[Chunk] = []
     for j in issues or []:
         note = (j.get("resolution_note") or "").strip()
+        # A tracker note is evidence for the agent, not copy for a customer.
+        # Most of these are one engineer talking to another, and 28 of the 38
+        # resolved notes in this export say nothing a customer can act on:
+        # "Could not reproduce", "Fixed in next release", "Config issue on
+        # tenant". Indexing those as if they were answers is how a draft ends
+        # up telling a customer we could not reproduce their problem.
+        #
+        # So the chunk carries the resolution only when a customer can use
+        # it. Otherwise it says, in grounded words, that the problem is known
+        # and a person has to take it -- which lets the model escalate from
+        # the passage instead of inventing a reassurance.
+        # Not indexed at all when the note says nothing a customer can use.
+        #
+        # The first attempt kept these as chunks that announced "a support
+        # engineer must take this ticket". That measured terribly: they are
+        # 35 of 38 issues, they outrank the process documents, and coverage
+        # fell to 6.7% against 43.3% with no tracker corpus at all. The
+        # corpus had become an escalation magnet -- every question retrieved
+        # a passage whose only content was "give this to a person".
+        #
+        # Nothing is lost by dropping them. The router already hands over a
+        # ticket it has no grounds to answer, so the "it is known" signal
+        # bought an escalation that was going to happen anyway, at the price
+        # of crowding out documents that could have answered.
+        if not customer_usable(note):
+            continue
         text = (f"Known issue {j['key']} ({j.get('component')}, "
                 f"{j.get('issue_type')}, priority {j.get('priority')}, "
                 f"status {j.get('status')}): {j.get('summary')}. "

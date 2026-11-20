@@ -54,6 +54,36 @@ TRACKER_ID = re.compile(r"\b(?:PNJ|JIRA|ENG)-\d{2,}\b")
 # banned it anyway, because "fix is in" matched, and the check then rejected
 # the exact sentence the system had been told to write. What makes a promise
 # is the specifics, so the version-and-date branch requires a digit.
+# C9 -- an engineer's verdict, repeated to the customer who raised the ticket.
+# These are all true statements about our tracker and all useless, or worse,
+# in a reply: "could not reproduce" tells a customer we did not find their
+# bug, "support content is out of date" tells them our documentation is
+# wrong. The index step withholds such notes, and this is the backstop for
+# when the model paraphrases one out of a passage that was kept.
+INTERNAL_VOICE = re.compile(
+    r"(?:could\s+not|cannot|can'?t|unable\s+to|couldn'?t|were\s+not\s+able\s+to)"
+    r"\s+(?:be\s+)?reprod"
+    r"|not\s+reproducible"
+    r"|work(?:s|ing|ed)?\s+as\s+(?:designed|intended)"
+    r"|by\s+design\b"
+    r"|won'?t\s+fix"
+    r"|support\s+(?:content|documentation|article)s?\s+(?:is\s+|are\s+|may\s+be\s+)?"
+    r"(?:out\s+of\s+date|stale|outdated)"
+    r"|config(?:uration)?\s+issue\s+on\s+(?:the\s+)?tenant"
+    r"|duplicate\s+of\s+(?:this\s+)?(?:issue|ticket|report)"
+    # An unevidenced promise of progress. The prompt no longer asks for this
+    # phrasing -- it used to, which is how it reached customers -- and a
+    # tracker entry is not a commitment that anyone is working on it today.
+    r"|(?:a\s+|the\s+)?fix\s+(?:is|will\s+be)\s+(?:currently\s+)?"
+    r"(?:in\s+progress|under\s*way|on\s+the\s+way|coming)"
+    r"|(?:is|are)\s+(?:currently\s+)?being\s+(?:worked\s+on|addressed|investigated)"
+    r"|(?:we|the\s+team|engineering)\s+(?:are|is)\s+(?:currently\s+)?"
+    r"(?:working\s+on|investigating|looking\s+into)\s+(?:a\s+fix|this|it)"
+    r"|under\s+investigation\b"
+    r"|(?:attempts?|efforts?)\s+to\s+reproduce\b[^.]{0,40}?(?:have|has|were|was)\s+(?:been\s+)?(?:unsuccessful|without\s+success)",
+    re.I)
+
+
 UNSHIPPED = re.compile(
     r"\b(?:"
     r"fix(?:ed)?\s+(?:is\s+|will\s+be\s+)?(?:in|coming\s+in|planned\s+for|"
@@ -139,6 +169,13 @@ def check(draft, *, tier: str | None = None, priority: str = "P3",
     if promise:
         fails.append("C8_unshipped_fix")
         detail["unshipped_fix"] = promise[:3]
+
+    # C9 -- internal register. A draft that reads like a tracker comment is
+    # not a reply, however well grounded it is.
+    voice = INTERNAL_VOICE.findall(text)
+    if voice:
+        fails.append("C9_internal_voice")
+        detail["internal_voice"] = voice[:3]
 
     # C1 — a draft with no citation is ungrounded by definition.
     if not draft.citations:

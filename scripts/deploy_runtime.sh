@@ -78,7 +78,14 @@ aws iam put-role-policy --role-name "$ROLE" --policy-name pilot-runtime --policy
 ROLE_ARN=$(aws iam get-role --role-name "$ROLE" --query Role.Arn --output text)
 
 # ---- artifact --------------------------------------------------------------
-test -f "$ZIP" || { echo "build it first: .venv/bin/python scripts/package_runtime.py"; exit 1; }
+# Always rebuild. This used to be `test -f "$ZIP"`, which silently shipped
+# whatever zip happened to be on disk: two runtime versions went out carrying
+# an artifact from an earlier session, and the code under test was never the
+# code running. A deploy script that can publish stale source is worse than
+# no deploy script.
+echo "packaging runtime from working tree"
+"${PYTHON:-.venv/bin/python}" scripts/package_runtime.py
+test -f "$ZIP" || { echo "packaging produced no $ZIP"; exit 1; }
 KEY="v$(date +%s)-ramco-runtime.zip"
 aws s3 cp "$ZIP" "s3://$BUCKET/$KEY" --only-show-errors
 echo "uploaded s3://$BUCKET/$KEY"
