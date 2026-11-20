@@ -1,0 +1,67 @@
+<!DOCTYPE html><html><head><style>
+html{background:#0B0E14;}
+body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
+.slide{margin:0;padding:26pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:9pt;margin:0 0 5pt 0;font-weight:bold;letter-spacing:1.5pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:23pt;margin:0 0 4pt 0;letter-spacing:-0.5pt;}
+.sub{color:#8B95A7;font-size:9.5pt;margin:0 0 14pt 0;line-height:1.45;}
+.mono{font-family:'Courier New',monospace;}
+.two{display:flex;gap:20pt;}
+.col{width:310pt;}
+.ct{color:#E6E9EF;font-size:10pt;font-weight:bold;margin:0 0 6pt 0;}
+.row{display:flex;width:310pt;border-top:1px solid #1D242F;padding:4pt 0 4pt 0;}
+.hrow{display:flex;width:310pt;padding:0 0 3pt 0;}
+.hrow p{color:#8B95A7;font-size:7pt;font-family:'Courier New',monospace;letter-spacing:0.4pt;margin:0;}
+.row p{margin:0;font-size:8.5pt;color:#C6CCD8;line-height:1.25;}
+.a1{width:185pt;}.a2{width:125pt;}
+.ok{color:#3ECF8E;font-family:'Courier New',monospace;font-weight:bold;}
+.no{color:#E8336D;font-family:'Courier New',monospace;font-weight:bold;}
+.note{color:#8B95A7;font-size:8.5pt;margin:8pt 0 0 0;line-height:1.5;}
+.note b{color:#E6E9EF;font-weight:normal;}
+.codebox{background:#121722;border:1px solid #1D242F;border-radius:4pt;padding:7pt 9pt;margin:0;}
+.code{font-family:'Courier New',monospace;font-size:8pt;color:#C6CCD8;margin:0;line-height:1.45;}
+</style></head><body><div class="slide">
+<p class="kicker">APPENDIX &nbsp;·&nbsp; MULTI-TENANCY</p>
+<h1>Scoping is a predicate, not a filter in the browser.</h1>
+<p class="sub">A signed-in organisation sees its own tickets and can resolve one. The organisation id comes from an HMAC-signed httpOnly cookie read on the server &mdash; never from the request body.</p>
+
+<div class="two">
+<div class="col">
+  <p class="ct">Tested against production</p>
+  <div class="hrow"><p class="a1">ACTION</p><p class="a2">RESULT</p></div>
+  <div class="row"><p class="a1">Resolve own ticket</p><p class="a2 ok">row updated</p></div>
+  <div class="row"><p class="a1">Same ticket id, other org</p><p class="a2 no">0 rows &middot; refused</p></div>
+  <div class="row"><p class="a1">Reopen own ticket</p><p class="a2 ok">row updated</p></div>
+  <p class="note"><b>The isolation test is the middle row.</b> A valid ticket id held by the wrong organisation matches no row, and the call says it changed nothing rather than reporting a success it did not perform.</p>
+</div>
+<div class="col">
+  <p class="ct">The statement that carries it</p>
+  <div class="codebox"><p class="code">UPDATE tickets<br/>&nbsp;&nbsp; SET status = %s, resolved_at = %s<br/>&nbsp;WHERE ticket_id&nbsp;&nbsp; = %s<br/>&nbsp;&nbsp; AND customer_id = %s</p></div>
+  <p class="note"><b>Served text is already masked.</b> <span class="mono">subject_masked</span> and <span class="mono">body_masked</span> are what the loader writes, and it raises rather than insert a row still carrying an identifier. The portal reads no raw column because there is no raw column.</p>
+  <p class="note"><b>One write, and it is honest about itself.</b> The database user is the instance master &mdash; &ldquo;read only&rdquo; here means the drafting code contains no statement that writes. This one is confined to a single module, two columns, scoped by organisation, unreachable from the drafting path.</p>
+</div>
+</div>
+</div></body></html>
+<!--NOTES
+Appendix. Pull up on "how would this work for more than one customer?"
+
+The answer is the WHERE clause, not the UI. Every statement takes
+customer_id, the UPDATE included, and the id comes from a signed httpOnly
+cookie read on the server. The browser is never asked which organisation it
+is, so it cannot answer wrongly.
+
+The demo worth doing live is the middle row of the left table: take a real
+ticket id from one organisation, send it as another, and watch it change
+zero rows and say so. That is the difference between an access check and a
+filter -- a filter you can remove from the request.
+
+If asked about authentication: it is a demo gate over synthetic data and the
+sign-in page says so. Signed cookie, no reset, no lockout, no rotation.
+Swapping it for a real IdP changes the first eight lines of session.ts.
+
+If asked about the write: be straight. The database user is the instance
+master. "Read only" in this project has always meant the drafting path
+contains no write, not that a grant forbids one -- that was true and sounded
+stronger than it was. Resolving a ticket is the one write, and it is a
+support record, not a payment. Money still never moves.
+-->
