@@ -14,6 +14,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import time
 import uuid
 
 import boto3
@@ -23,6 +24,68 @@ API_KEY = os.environ["API_KEY"]
 QUALIFIER = os.environ.get("QUALIFIER", "DEFAULT")
 
 _client = boto3.client("bedrock-agentcore")
+
+# ---------------------------------------------------------------------------
+# Session reuse, which is where three quarters of the latency went.
+#
+# AgentCore routes every invoke carrying the same runtimeSessionId to the same
+# microVM, and keeps that microVM warm through 15 minutes of idle time. This
+# function used to mint a fresh uuid4 per request. That asks for a brand-new
+# microVM every single time, so no request ever met a warm one and every
+# customer paid a full cold start: Python starting, boto3 and psycopg
+# importing, a Secrets Manager fetch for the database password, a fresh
+# Postgres connection, and a full read of the customer table -- all before the
+# first line of the pipeline ran.
+#
+# Measured through this endpoint at production pace, that was 4.26 s at p50
+# against 1.28 s of actual pipeline work. The slow part was not the pipeline
+# and not AgentCore; it was this uuid4.
+#
+# Reusing one session per Lambda execution environment is safe here because
+# the runtime holds no per-ticket state worth isolating. What it does hold is
+# shared reference data -- the customer table, which maps a customer to their
+# region and therefore must be loaded before a region can be chosen, and a
+# content-addressed embedding cache that maps a text to that same text's own
+# vector. Both are already process-global inside a single invocation, and the
+# eval harness has always run thousands of tickets through one process. Case
+# data stays in Postgres, one database per region, which this does not touch.
+#
+# Rotation has two clocks. The idle one stays under AgentCore's 15-minute
+# timeout, so this function stops addressing a session the platform has
+# already reclaimed. The age one bounds how long any one microVM serves
+# traffic, so a leak or a wedged connection cannot persist indefinitely.
+SESSION_MAX_IDLE_S = 10 * 60
+SESSION_MAX_AGE_S = 60 * 60
+
+_session_id: str | None = None
+_session_born = 0.0
+_session_used = 0.0
+
+
+def _session() -> str:
+    """The session id to invoke with: the warm one, or a new one."""
+    global _session_id, _session_born, _session_used
+    now = time.monotonic()
+    if (_session_id is None
+            or now - _session_used > SESSION_MAX_IDLE_S
+            or now - _session_born > SESSION_MAX_AGE_S):
+        # 36 characters. AgentCore requires at least 33, so a bare uuid4 hex
+        # (32) is rejected -- keep the dashes.
+        _session_id = str(uuid.uuid4())
+        _session_born = now
+    _session_used = now
+    return _session_id
+
+
+def _drop_session() -> None:
+    """Forget the warm session after a failed invoke.
+
+    An invoke can fail because the session itself is gone or wedged, and
+    retrying into the same id would fail the same way. Dropping it costs the
+    next request one cold start and makes the failure self-healing.
+    """
+    global _session_id
+    _session_id = None
 
 
 def _reply(status: int, body: dict) -> dict:
@@ -53,10 +116,11 @@ def handler(event, _context):
         response = _client.invoke_agent_runtime(
             agentRuntimeArn=RUNTIME_ARN,
             qualifier=QUALIFIER,
-            runtimeSessionId=str(uuid.uuid4()),
+            runtimeSessionId=_session(),
             contentType="application/json",
             payload=json.dumps(clean).encode(),
         )
         return _reply(200, json.loads(response["response"].read()))
     except Exception as exc:                      # noqa: BLE001
+        _drop_session()
         return _reply(502, {"error": f"{type(exc).__name__}: {exc}"[:400]})

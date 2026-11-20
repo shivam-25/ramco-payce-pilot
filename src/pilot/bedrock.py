@@ -5,7 +5,8 @@ usage is recorded at the point of the call rather than estimated afterwards,
 so each helper returns usage alongside the text and `Meter` accumulates it.
 """
 from __future__ import annotations
-import json, threading, time
+import json, os, threading, time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 
 import boto3
@@ -46,6 +47,37 @@ RPM = {
 _DEFAULT_RPM = 10
 _SAFETY = 0.8          # stay under the ceiling; bursts still get a 429
 
+# The limiter is eval scaffolding, and it is OFF unless a sweep asks for it.
+#
+# It was not, and that cost twice. In production it can only ever add delay:
+# it protects against a free-plan quota that real traffic -- 1.4 requests a
+# minute against a 10-20 rpm ceiling -- never approaches, so every sleep it
+# takes is a customer waiting for nothing. Two tickets triaged back to back
+# in the console hit a 7.5 s wait on the second, caused entirely by this
+# code. `_with_backoff` already retries what AWS actually throttles, so
+# turning the limiter off does not risk correctness; it moves the wait from
+# "always, pre-emptively" to "only when AWS pushes back".
+#
+# It also corrupted a measurement. The drafter comparison reported p50 7.40 s
+# for both Nova Lite and Nova Pro and I read that as "same latency". It was
+# not a latency at all: neither model appears in the table above, so both got
+# `_DEFAULT_RPM` = 10, and 60 / (10 * 0.8) is 7.5 s. The figure was this
+# limiter's own sleep, identical across the arms because the arms shared a
+# default. A model id missing from a dict became a published number.
+#
+# So the default is now explicit about what it is: a fallback for a model
+# whose real quota nobody has looked up. When the limiter is on and this
+# fires, it says so, because silence is how the 7.40 s happened.
+# Read per call rather than captured at import, so a caller that sets the
+# variable does not also have to import this module after setting it. The
+# gates do set it first, but one of them importing `pilot` a line early
+# should not silently turn the limiter off for a whole sweep.
+_warned: set[str] = set()
+
+
+def limiter_enabled() -> bool:
+    return os.environ.get("PILOT_RATE_LIMIT", "") not in ("", "0", "false", "no")
+
 
 class _Limiter:
     """One shared token bucket per model, across every thread in the process."""
@@ -60,7 +92,17 @@ class _Limiter:
         The reservation happens exactly once, under the lock, so concurrent
         callers queue up behind each other instead of all claiming `now`.
         """
-        gap = 60.0 / (RPM.get(model, _DEFAULT_RPM) * _SAFETY)
+        rpm = RPM.get(model)
+        if rpm is None:
+            rpm = _DEFAULT_RPM
+            if model not in _warned:
+                _warned.add(model)
+                print(f"[rate-limit] {model} is not in RPM; assuming "
+                      f"{_DEFAULT_RPM} rpm, so every call to it waits "
+                      f"{60.0 / (_DEFAULT_RPM * _SAFETY):.1f}s. Any latency "
+                      f"measured for this model is this wait, not the model.",
+                      flush=True)
+        gap = 60.0 / (rpm * _SAFETY)
         with self._lock:
             now = time.monotonic()
             due = max(self._next.get(model, 0.0), now)
@@ -105,7 +147,8 @@ def _with_backoff(fn, model: str, attempts: int = 8):
     """Rate-limit first, then retry what still gets throttled."""
     import random
     for i in range(attempts):
-        _limiter.wait(model)
+        if limiter_enabled():
+            _limiter.wait(model)
         try:
             return fn()
         except ClientError as exc:
@@ -183,17 +226,34 @@ def converse(model: str, prompt: str, system: str | None = None,
     return text, Usage(model, u.get("inputTokens", 0), u.get("outputTokens", 0), dt)
 
 
-_embed_cache: dict[str, list[float]] = {}
+# Content-addressed: a key is a text and its value is that same text's own
+# vector, so a hit can only ever return what the caller asked to embed.
+#
+# Bounded, because the runtime's process is long-lived now that AgentCore
+# sessions are reused. Unbounded was fine while every request got a fresh
+# microVM that was thrown away afterwards; a microVM that serves an hour of
+# traffic would grow this until it was killed for memory. 4,096 vectors at
+# 512 float32 dimensions is a few megabytes, and the eval sweep's 35 golden
+# questions and 1,341 tickets both fit inside it.
+_EMBED_CACHE_MAX = 4096
+_embed_cache: "OrderedDict[str, list[float]]" = OrderedDict()
+_embed_lock = threading.Lock()
 
 
 def embed(text: str) -> tuple[list[float], Usage]:
     """Identical text gives an identical vector, so the bake-off does not pay
     to embed the same 35 questions sixteen times over."""
     key = text[:8000]
-    if key in _embed_cache:
-        return _embed_cache[key], Usage(EMBED_MODEL, 0, 0, 0.0)
+    with _embed_lock:
+        if key in _embed_cache:
+            _embed_cache.move_to_end(key)
+            return _embed_cache[key], Usage(EMBED_MODEL, 0, 0, 0.0)
     v, u = _embed_uncached(text)
-    _embed_cache[key] = v
+    with _embed_lock:
+        _embed_cache[key] = v
+        _embed_cache.move_to_end(key)
+        while len(_embed_cache) > _EMBED_CACHE_MAX:
+            _embed_cache.popitem(last=False)
     return v, u
 
 

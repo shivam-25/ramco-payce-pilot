@@ -7,11 +7,11 @@ Every stage writes an audit row. That is what lets the pilot PROVE the gate
 ran and the human approved, instead of asserting it in a policy document.
 """
 from __future__ import annotations
-import json, time
+import json, threading, time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
-from .bedrock import Meter
+from .bedrock import Meter, embed, limiter_enabled
 from .classify import classify
 from .cache import lookup as cache_lookup, store as cache_store
 from .db import connect
@@ -63,6 +63,28 @@ class Result:
         return d
 
 
+def _warm_embed(text: str, meter: Meter) -> None:
+    """Fill the embedding memo for this question, off the critical path.
+
+    The usage is credited to the meter here, in the thread, rather than
+    returned. It has to be: G7 prices every gate run from the token counts
+    Bedrock actually reported, and an embedding computed in a thread whose
+    result nobody collected would be a real call with no cost against it. The
+    memo returns a zero-token Usage on a hit, so the later callers that find
+    the vector already there add nothing and the total stays exact.
+
+    `Meter.add` only appends to a list, which is atomic, so no lock is needed.
+
+    A failure here is deliberately silent: this is a warm-up, and whoever
+    actually needs the vector calls `embed` again and gets the real error.
+    """
+    try:
+        _, usage = embed(text)
+        meter.add(usage)
+    except Exception:
+        pass
+
+
 def _audit(conn, ticket_id, stage, detail):
     try:
         conn.execute("INSERT INTO audit_log (ticket_id, stage, detail) "
@@ -104,6 +126,33 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     t0 = clock()
     ticket, resolved = enrich(ticket)
     t["lookup"] = (clock() - t0) * 1000
+
+    # The question's embedding depends on nothing the next two boxes produce,
+    # and three later steps all need it: the cache lookup, retrieval, and the
+    # cache store. Each calls `embed`, which memoises on the text, so
+    # computing it once here makes all three free and takes its latency off
+    # the critical path instead of adding it to classify's.
+    #
+    # It is started before the classifier and joined before the first use, so
+    # the two Bedrock calls overlap rather than queue. Joining matters: `embed`
+    # has no in-flight de-duplication, so an unjoined warm-up would simply be
+    # a second call racing the first and would buy nothing.
+    #
+    # A ticket the router sends to a human never uses the vector, so on those
+    # the warm-up is wasted -- 70% of the G7 peak-week sample. It is a
+    # thousandth of a cent each and off the critical path either way, and the
+    # alternative is not knowing the queue, which is what the classifier is
+    # for. Paying it on every ticket is the cheaper side of that trade.
+    #
+    # Skipped when the rate limiter is on, which is to say during a sweep.
+    # Two limited calls cannot overlap -- they queue in the same token bucket
+    # -- so the thread would buy nothing there and would charge its sleep to
+    # the wrong thread's throttle tally, which is the figure G7 subtracts.
+    warm = None
+    if not limiter_enabled():
+        warm = threading.Thread(target=_warm_embed, args=(text, meter),
+                                daemon=True)
+        warm.start()
 
     res = Result(ticket_id=ticket.ticket_id, route="", reason="",
                  region=ticket.region, tier=ticket.tier,
@@ -165,6 +214,9 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
                {"counts": red.counts, "leaks": 0})
         _audit(conn, ticket.ticket_id, "router",
                {"route": res.route, "reason": res.reason, "queue": queue})
+
+        if warm is not None:
+            warm.join(timeout=30)
 
         if use_cache:
             t0 = clock()

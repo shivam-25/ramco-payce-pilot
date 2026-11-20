@@ -2,9 +2,25 @@
 report row. Kept deliberately small — a test harness that needs its own tests
 is not a harness."""
 from __future__ import annotations
-import json, sys, time
+import json, os, sys, time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+# Turn the Bedrock rate limiter on for every gate, before pilot.bedrock is
+# imported and reads this.
+#
+# A sweep is the only thing that needs it: it fires 1,341 tickets as fast as
+# four threads allow, against a free-plan quota of 10-20 requests a minute,
+# and without a limiter it spends its life in backoff. The deployed runtime
+# needs the opposite -- real traffic is 1.4 requests a minute, so a
+# pre-emptive sleep there is a customer waiting for nothing. Same code, and
+# the difference between the two is this line rather than a branch in the
+# pipeline.
+#
+# The cost of the split is that a gate's wall-clock latency is now explicitly
+# not production's. G7 already separated those two numbers and gates on the
+# one with the limiter's sleep subtracted, so what it gates on is unchanged.
+os.environ.setdefault("PILOT_RATE_LIMIT", "1")
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))

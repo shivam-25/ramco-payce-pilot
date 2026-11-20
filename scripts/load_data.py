@@ -10,13 +10,16 @@ Ticket text is masked by the PII gate BEFORE it is written. The raw body
 never reaches the database.
 """
 from __future__ import annotations
-import csv, json, sys
+import os, csv, json, sys
 from collections import Counter
 from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+# A bulk sweep against a free-plan Bedrock quota needs the rate limiter;
+# the deployed runtime does not. See pilot.bedrock.
+os.environ.setdefault("PILOT_RATE_LIMIT", "1")
 
 from pilot.config import DATA_ROOM, REGIONS          # noqa: E402
 from pilot.db import connect                          # noqa: E402

@@ -7,11 +7,14 @@ process, not customer data), that region's statutory rules, and the KB index
 entries marked for that region or ALL.
 """
 from __future__ import annotations
-import json, sys
+import os, json, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+# A bulk sweep against a free-plan Bedrock quota needs the rate limiter;
+# the deployed runtime does not. See pilot.bedrock.
+os.environ.setdefault("PILOT_RATE_LIMIT", "1")
 
 from pilot.config import DATA_ROOM, REGIONS       # noqa: E402
 from pilot.db import connect                       # noqa: E402

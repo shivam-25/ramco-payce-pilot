@@ -5,12 +5,15 @@ the same files byte for byte, so the gates are reproducible and the numbers in
 the submission can be recomputed by anyone with the repo.
 """
 from __future__ import annotations
-import json, re, sys
+import os, json, re, sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+# A bulk sweep against a free-plan Bedrock quota needs the rate limiter;
+# the deployed runtime does not. See pilot.bedrock.
+os.environ.setdefault("PILOT_RATE_LIMIT", "1")
 
 from pilot.config import DATA_ROOM                       # noqa: E402
 from pilot.normalise import normalise                     # noqa: E402
