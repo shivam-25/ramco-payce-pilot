@@ -1,0 +1,51 @@
+<!DOCTYPE html><html><head><style>
+html{background:#0B0E14;}
+body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
+.slide{margin:0;padding:30pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:10pt;margin:0 0 7pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:31pt;margin:0 0 3pt 0;letter-spacing:-0.7pt;line-height:1.08;}
+h1 span{color:#3ECF8E;}
+.sub{color:#8B95A7;font-size:10.5pt;margin:0 0 14pt 0;}
+.mono{font-family:'Courier New',monospace;}
+.grid{display:flex;flex-wrap:wrap;gap:9pt;width:640pt;}
+.b{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:8pt 10pt;width:207pt;box-sizing:border-box;height:47pt;}
+.b.m{border:1.5pt solid #E8336D;background:#1C1420;}
+.bn{color:#E6E9EF;font-size:10.5pt;font-weight:bold;margin:0 0 2pt 0;}
+.bt{color:#8B95A7;font-size:8.5pt;margin:0;font-family:'Courier New',monospace;}
+.foot{color:#8B95A7;font-size:10.5pt;margin:14pt 0 0 0;line-height:1.45;}
+.foot b{color:#E6E9EF;font-weight:normal;}
+</style></head><body><div class="slide">
+<p class="kicker">THE ONE DESIGN DECISION</p>
+<h1>Rules in code. <span>Judgement in the model.</span></h1>
+<p class="sub">Nine stages. Two use a model &mdash; outlined in pink. Every box can refuse, and nothing sends itself.</p>
+<div class="grid">
+<div class="b"><p class="bn">1 &middot; PII gate</p><p class="bt">masked first, before any model &middot; &lt;1ms</p></div>
+<div class="b"><p class="bn">2 &middot; Normalise</p><p class="bt">3 export schemas, one shape &middot; &lt;1ms</p></div>
+<div class="b"><p class="bn">3 &middot; Lookup</p><p class="bt">region, tier, SLA clock &middot; &lt;1ms</p></div>
+<div class="b"><p class="bn">4 &middot; Injection screen</p><p class="bt">refused before a model is paid &middot; &lt;1ms</p></div>
+<div class="b m"><p class="bn">5 &middot; Classify</p><p class="bt">Nova Micro &middot; nine queues &middot; 340ms</p></div>
+<div class="b"><p class="bn">6 &middot; Router</p><p class="bt">money or P1 &rarr; a person &middot; &lt;1ms</p></div>
+<div class="b"><p class="bn">7 &middot; Dedupe</p><p class="bt">5th report raises an incident &middot; &lt;1ms</p></div>
+<div class="b m"><p class="bn">8 &middot; Retrieve &amp; answer</p><p class="bt">Nova Pro &middot; dated, cited &middot; ~1.5s</p></div>
+<div class="b"><p class="bn">9 &middot; Output check</p><p class="bt">C1&ndash;C9, or withhold it &middot; &lt;1ms</p></div>
+</div>
+<p class="foot"><b>A model that is 97% right about whether money is involved is 3% wrong about money</b> &mdash; so that question never reaches one. PII, injection, money and dates are decided by code with tests.</p>
+</div></body></html>
+<!--NOTES
+40 SECONDS. This is the slide the whole thing hangs on.
+
+"Everything that can be decided by a rule IS decided by a rule, in code I can
+test. Only two of the nine stages use a model."
+
+Point at three things, fast:
+- "The gate is FIRST, so no model ever sees an identifier."
+- "The injection screen is BEFORE classification, so a hostile ticket costs
+  nothing."
+- "Money, P1 and unknown region go to a person -- that's policy, not
+  inference."
+
+The line to land: "A model that's ninety-seven percent right about whether
+money is involved is three percent wrong about money. So I never ask one."
+
+Then straight to the RAG slide. Do not read the boxes out.
+-->

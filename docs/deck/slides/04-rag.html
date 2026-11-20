@@ -26,30 +26,30 @@ h1{color:#E6E9EF;font-size:25pt;margin:0 0 14pt 0;letter-spacing:-0.5pt;}
 <div class="flow">
   <div class="bx" style="width:148pt;"><p class="bn">4 policy documents</p><p class="bd">runbook, SLA, SOP,<br>escalation policy</p></div>
   <p class="ar">&rarr;</p>
-  <div class="bx key" style="width:160pt;"><p class="bn">Chunk on headings</p><p class="bd">doc title, heading trail,<br>region, effective DATES</p></div>
+  <div class="bx key" style="width:160pt;"><p class="bn">Document-aware chunking</p><p class="bd">+ contextual header enrichment:<br>doc, heading trail, region, DATES</p></div>
   <p class="ar">&rarr;</p>
-  <div class="bx" style="width:140pt;"><p class="bn">Titan Embed v2</p><p class="bd">512 dims &middot; no loss<br>vs 1024, half the index</p></div>
+  <div class="bx" style="width:140pt;"><p class="bn">Titan Embed v2</p><p class="bd">512 of 1024 dims &middot; no<br>measured loss, half the index</p></div>
   <p class="ar">&rarr;</p>
-  <div class="bx" style="width:140pt;"><p class="bn">Postgres, one per region</p><p class="bd">pgvector HNSW<br>+ tsvector GIN</p></div>
+  <div class="bx" style="width:140pt;"><p class="bn">Postgres, one per region</p><p class="bd">pgvector HNSW (ANN)<br>+ tsvector GIN (sparse)</p></div>
 </div>
 
 <p class="lane">QUERY TIME &nbsp;&middot;&nbsp; PER TICKET, ~1.5s</p>
 <div class="flow">
   <div class="bx" style="width:104pt;"><p class="bn">Masked ticket<br>+ as_of date</p><p class="bd">an input, not an<br>afterthought</p></div>
   <p class="ar">&rarr;</p>
-  <div class="bx key" style="width:132pt;"><p class="bn">PRE-FILTER in SQL</p><p class="bd">region + rule in force<br>that date, before ranking</p></div>
+  <div class="bx key" style="width:132pt;"><p class="bn">Metadata pre-filter</p><p class="bd">predicate pushdown: region<br>+ rule in force, before ranking</p></div>
   <p class="ar">&rarr;</p>
   <div class="pair" style="width:118pt;">
-    <div class="bx sm"><p class="bn">Dense &middot; HNSW cosine</p></div>
-    <div class="bx sm"><p class="bn">Lexical &middot; ts_rank_cd</p></div>
+    <div class="bx sm"><p class="bn">Dense ANN &middot; HNSW cosine</p></div>
+    <div class="bx sm"><p class="bn">Sparse FTS &middot; ts_rank_cd</p></div>
   </div>
   <p class="ar">&rarr;</p>
-  <div class="bx" style="width:86pt;"><p class="bn">RRF fuse</p><p class="bd">k=60<br>top 5</p></div>
+  <div class="bx" style="width:86pt;"><p class="bn">RRF fusion</p><p class="bd">rank-based, k=60<br>top 5</p></div>
   <p class="ar">&rarr;</p>
   <div class="bx mdl" style="width:106pt;"><p class="bn">Nova Pro drafts</p><p class="bd">with citations,<br>or refuses</p></div>
 </div>
 
-<p class="foot"><b>No re-ranker.</b> Ordering is already MRR 0.95 / hit@5 0.97 &mdash; about 0.05 of headroom &mdash; while faithfulness and corpus coverage are the real limits. <span class="mono">ap-southeast-2</span> also offers no rerank model, and RRF is fusion, not re-ranking: it reorders two lists, it never scores a query and passage jointly.</p>
+<p class="foot"><b>No cross-encoder re-ranking.</b> Ordering is already MRR 0.95 / hit@5 0.97 &mdash; ~0.05 headroom &mdash; while faithfulness and corpus coverage are the binding limits. <span class="mono">ap-southeast-2</span> exposes no rerank model. RRF is <span class="mono">fusion</span>, not re-ranking: it merges two rankings, never scoring query and passage jointly.</p>
 </div></body></html>
 <!--NOTES
 Walk the two lanes, don't read the boxes.

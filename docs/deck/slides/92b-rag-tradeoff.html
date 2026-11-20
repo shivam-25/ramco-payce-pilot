@@ -1,0 +1,74 @@
+<!DOCTYPE html><html><head><style>
+html{background:#0B0E14;}
+body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
+.slide{margin:0;padding:28pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:10pt;margin:0 0 6pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:24pt;margin:0 0 3pt 0;letter-spacing:-0.5pt;}
+.sub{color:#8B95A7;font-size:10pt;margin:0 0 13pt 0;}
+.mono{font-family:'Courier New',monospace;}
+.two{display:flex;gap:18pt;}
+.col{width:311pt;}
+.ct{color:#E6E9EF;font-size:10.5pt;font-weight:bold;margin:0 0 6pt 0;}
+table{border-collapse:collapse;width:311pt;}
+th{color:#8B95A7;font-size:7.5pt;text-align:left;padding:0 4pt 4pt 0;font-family:'Courier New',monospace;font-weight:normal;letter-spacing:0.4pt;}
+td{color:#C6CCD8;font-size:8.5pt;padding:3.5pt 4pt 3.5pt 0;border-top:1px solid #1D242F;line-height:1.25;}
+td.m{font-family:'Courier New',monospace;}
+tr.win td{color:#3ECF8E;font-weight:bold;}
+td.bad{color:#E8336D;font-family:'Courier New',monospace;}
+.note{color:#8B95A7;font-size:9pt;margin:9pt 0 0 0;line-height:1.4;}
+.note b{color:#E6E9EF;font-weight:normal;}
+</style></head><body><div class="slide">
+<p class="kicker">APPENDIX &nbsp;·&nbsp; CHUNKING AND RETRIEVAL, BY MEASUREMENT</p>
+<h1>Chosen from the standard taxonomy, not by assumption.</h1>
+<p class="sub">4 chunking &times; 4 retrieval strategies &middot; 35 golden questions &middot; k=5 &middot; set-arithmetic scoring, no LLM judge.</p>
+<div class="two">
+<div class="col">
+  <p class="ct">Chunking</p>
+  <table>
+  <tr><th>TECHNIQUE</th><th>CRITERION</th><th>OUTCOME</th></tr>
+  <tr><td>Document-level</td><td class="m">no split</td><td>dilutes signal</td></tr>
+  <tr><td>Fixed-size + sliding window</td><td class="m">512 tok, 64 ovl</td><td>splits tables</td></tr>
+  <tr><td>Document-aware</td><td class="m">headings</td><td>loses provenance</td></tr>
+  <tr class="win"><td>+ contextual header enrichment</td><td class="m">headings + doc, trail, region, dates</td><td>SHIPPED</td></tr>
+  </table>
+  <p class="note"><b>Not evaluated:</b> semantic (structure already encodes the boundaries), parent-child (0.03 headroom), agentic (non-deterministic, 4 files), late chunking (token-level output not exposed by Titan v2).</p>
+</div>
+<div class="col">
+  <p class="ct">Retrieval</p>
+  <table>
+  <tr><th>STRATEGY</th><th>MECHANISM</th><th>MRR</th><th>DATE</th></tr>
+  <tr><td class="m">R1_dense</td><td>ANN, HNSW cosine</td><td class="m">0.89</td><td class="bad">0.40</td></tr>
+  <tr><td class="m">R2_lexical</td><td>sparse FTS, ts_rank_cd</td><td class="m">0.23</td><td class="bad">0.00</td></tr>
+  <tr><td class="m">R3_hybrid</td><td>R1+R2, RRF k=60</td><td class="m">0.92</td><td class="bad">0.40</td></tr>
+  <tr class="win"><td class="m">R4_hybrid_dated</td><td>R3 + metadata pre-filter</td><td>0.87</td><td>1.00</td></tr>
+  </table>
+  <p class="note"><b>R3 dominates R4 on every conventional IR metric and is not shipped.</b> R4 wins the only metric tied to the failure mode. Selecting on MRR reproduces the vendor defect with a better scorecard.</p>
+</div>
+</div>
+<p class="note"><b>Pre-filtering, not post-filtering</b> &mdash; predicate pushdown into the <span class="mono">WHERE</span> of both arms, before ranking. Post-filtering degrades effective k: retrieve 5, discard 3 out-of-period, answer from 2. <b>No cross-encoder re-ranking</b> &mdash; ~0.05 MRR headroom, no rerank model in region, and RRF is fusion, not re-ranking.</p>
+</div></body></html>
+<!--NOTES
+Appendix. Pull this up when asked how chunking or retrieval was chosen.
+
+The taxonomy framing is the point: these are the standard techniques, four
+were run, and the ones that weren't have a stated reason rather than silence.
+
+Left column, the one line that matters: the winner is document-aware chunking
+with contextual header enrichment -- every chunk carries its document title,
+heading trail, region and effective dates. That metadata is per chunk, not per
+document, which is the only reason a temporal predicate works at chunk
+granularity.
+
+Right column: R3 beats R4 on hit@5, MRR and precision. R4 ships. The only
+column R4 wins is temporal correctness, and that is the column the incident
+was about.
+
+Pre-filter vs post-filter is worth saying precisely: predicates are pushed
+into the WHERE of BOTH the ANN and the FTS arm before either ranks. Filtering
+after the search silently shrinks k.
+
+Why no re-ranker: ~0.05 of MRR headroom, no amazon.rerank or cohere.rerank in
+ap-southeast-2, and the LLM substitute costs 300ms of a 3-second gate. And be
+precise -- RRF merges two rankings, it never scores query and passage jointly,
+so it is not a cross-encoder.
+-->

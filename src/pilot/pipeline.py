@@ -17,10 +17,12 @@ from .cache import lookup as cache_lookup, store as cache_store
 from .db import connect
 from .dedupe import case_id_for, record_and_count, INCIDENT_AT
 from .injection import screen
+from . import guardrail as gr
 from .lookup import customers, customer_names, enrich, sla, in_payroll_week
 from .normalise import normalise
 from .outputcheck import check
-from .pii import redact_ticket, leaks, downstream_text
+from .pii import (redact_ticket, leaks, downstream_text,
+                  TEXT_FIELDS as PII_TEXT_FIELDS)
 from .router import decide, Route
 from .answer import answer as draft_answer
 
@@ -122,6 +124,7 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
             on_event({"event": event, **kw})
 
     # ---- box 1: PII gate. Before everything. -------------------------
+    gr_failed = False          # defence 1.5 unavailable -> route to a person
     t0 = clock()
     masked_raw, red = redact_ticket(raw, customer_names())
     t["pii"] = (clock() - t0) * 1000
@@ -134,6 +137,36 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     residual = leaks(downstream_text(masked_raw))
     if residual:
         raise RuntimeError(f"PII gate leaked: {residual[:3]}")
+
+    # Defence 1.5. The regex gate is deterministic about the identifiers it
+    # knows and blind to the ones no pattern enumerates -- a person named in
+    # free text who is not on the roster, a street address. Guardrails is
+    # asked the same question about the text the gate just cleared, and what
+    # it finds is masked in the same placeholder format.
+    #
+    # Fail closed: if the call errors, the ticket goes to a person. An
+    # unavailable screen must not read as a clean screen.
+    gv = gr.apply(downstream_text(masked_raw))
+    t["guardrail_pii"] = gv.ms
+    if gv.ran:
+        emit("stage", box="guardrail pii", ms=round(gv.ms, 1),
+             note=("error" if gv.error else
+                   (", ".join(gv.pii) if gv.pii else "nothing further")))
+    if gv.error:
+        gr_failed = True
+    elif gv.spans:
+        # Re-mask field by field, so the shape of the ticket is preserved --
+        # the same reason the regex gate re-redacts rather than splicing.
+        for _f in PII_TEXT_FIELDS:
+            if masked_raw.get(_f):
+                masked_raw[_f] = gr.redact(str(masked_raw[_f]), gv.spans)
+        for _e in (masked_raw.get("events") or masked_raw.get("history")
+                   or masked_raw.get("activity_log") or []):
+            _m = _e.get("meta") or _e.get("data") or _e.get("info") or {}
+            if _m.get("note"):
+                _m["note"] = gr.redact(str(_m["note"]), gv.spans)
+        for kind in gv.pii:
+            red.counts[kind] = red.counts.get(kind, 0) + 1
 
     # ---- box 2: normalise --------------------------------------------
     t0 = clock()
@@ -190,6 +223,21 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     emit("stage", box="injection", ms=round(t["injection"], 1),
          note="blocked" if blocked else "clean")
 
+    # Defence 1.5 again, and only on what the patterns let through -- an
+    # obviously hostile ticket is already refused and still costs nothing.
+    # Guardrails catches the paraphrase that does not look like any pattern.
+    if not blocked:
+        iv = gr.apply(text)
+        t["guardrail_injection"] = iv.ms
+        if iv.ran:
+            emit("stage", box="guardrail injection", ms=round(iv.ms, 1),
+                 note=("error" if iv.error else
+                       ("prompt attack" if iv.injection else "clean")))
+        if iv.injection:
+            blocked, reasons = True, ["guardrail_prompt_attack"]
+        elif iv.error:
+            gr_failed = True
+
     # ---- box 4: classify ----------------------------------------------
     queue = None
     if not blocked:
@@ -211,6 +259,16 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     res.route = decision.route.value
     res.reason = decision.reason
     res.needs_approval = decision.needs_approval
+
+    # Fail closed. If defence 1.5 could not be reached, this ticket has only
+    # had the regex screens run on it, and those are blind to an off-roster
+    # name and to a paraphrased injection. That is not a clean screen, it is
+    # an absent one, so a person decides.
+    if gr_failed and res.route != "human":
+        res.route = "human"
+        res.needs_approval = True
+        res.reason = ("the managed screen for names and paraphrased injection "
+                      "was unavailable, so this was not fully checked")
     res.sla_hours = sla(ticket.tier, ticket.priority)
 
     if decision.route is Route.HUMAN:
