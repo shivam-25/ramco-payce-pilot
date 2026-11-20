@@ -21,7 +21,12 @@ type Run = {
               effective_to?: string }[];
   priority?: string; similarity?: number; cost?: { usd: number; by_model: Record<string,
     { calls: number; in: number; out: number; usd: number }> };
-  output_check?: Record<string, string>; timings_ms?: Record<string, number>;
+  // Two shapes reach here: a flat {check: message} map, and the fuller
+  // {passed, failures, detail} the output check itself returns. Reading
+  // only the first listed "passed" and "failures" as if they were checks.
+  output_check?: Record<string, unknown> & {
+    passed?: boolean; failures?: string[]; detail?: Record<string, unknown>;
+  }; timings_ms?: Record<string, number>;
   pii_counts?: Record<string, number>; cache_hit?: boolean;
 };
 
@@ -139,6 +144,16 @@ export default function Detail({ id, onBack, onChanged }:
   const stages = Object.entries(run?.timings_ms || {});
   const gateCounts = Object.entries(t.pii_counts || {});
 
+  // Which checks held the draft back, whichever shape the server used.
+  const oc = run?.output_check;
+  const failures: string[] = Array.isArray(oc?.failures)
+    ? (oc!.failures as string[])
+    : Object.keys(oc || {}).filter(
+        (k) => !["passed", "failures", "detail"].includes(k));
+  const failureDetail = failures
+    .map((f) => txt((oc?.detail as Record<string, unknown>)?.[f] ?? oc?.[f]))
+    .filter(Boolean).join(" · ");
+
   return (
     <div className="dwrap">
       <div className="dtop">
@@ -188,8 +203,8 @@ export default function Detail({ id, onBack, onChanged }:
               <dt>Human intervention</dt>
               <dd>{run.needs_approval ? "required" : "—"}</dd>
               <dt>Reason codes</dt>
-              <dd className="mono">{Object.keys(run.output_check || {}).length
-                ? Object.keys(run.output_check!).join(", ")
+              <dd className="mono">{failures.length
+                ? failures.join(", ")
                 : run.route === "human" ? "ROUTED_TO_PERSON" : "AUTO_ANSWER"}</dd></>}
             <dt>Resolved</dt><dd>{stamp(t.resolved_at)}</dd>
           </dl>
@@ -312,13 +327,13 @@ export default function Detail({ id, onBack, onChanged }:
                 <dt>Cost</dt><dd>${(run.usd ?? 0).toFixed(6)}</dd>
                 <dt>Cache</dt><dd>{run.cache_hit ? "reused" : "fresh"}</dd>
               </dl>
-              {!!Object.keys(run.output_check || {}).length && (
+              {!!failures.length && (
                 <>
                   <p className="dh">Held back by</p>
                   <ul className="dchips">
-                    {Object.entries(run.output_check!).map(([k, v]) =>
-                      <li key={k}>{txt(v)}</li>)}
+                    {failures.map((f) => <li key={f}>{f}</li>)}
                   </ul>
+                  {!!failureDetail && <p className="dnote">{failureDetail}</p>}
                 </>
               )}
             </>

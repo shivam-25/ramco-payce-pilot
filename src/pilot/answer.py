@@ -237,6 +237,14 @@ def answer(conn, question: str, *, region: str, as_of: date,
         if lang != "en":
             customer_half, english_half = split_bilingual(why, lang)
             why = english_half or customer_half
+            # The instruction says "say IN ENGLISH what is missing", and the
+            # model sometimes repeats the marker back, after restating the
+            # question. Neither is the explanation, and both push the part
+            # the agent needs off the end of a one-line field.
+            m = re.search(r"IN\s+ENGLISH\s*:?\s*(.+)$", why,
+                          flags=re.I | re.S)
+            if m:
+                why = m.group(1)
         why = re.sub(r"\s+", " ", why).strip(" .-")
         return Draft(text="", citations=[], passages=hits, escalate=True,
                      usage=usage, language=lang,
