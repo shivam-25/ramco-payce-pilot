@@ -112,6 +112,37 @@ else
     --environment-variables "$ENVV" --query agentRuntimeVersion --output text
 fi
 
+# ---- recycle the proxy's warm sessions -------------------------------------
+# The proxy reuses one AgentCore session per Lambda execution environment,
+# which is what took first-reply latency from 6.17 s to 2.51 s at p95. The
+# cost is that a warm session keeps serving the runtime version it started
+# on: deploy a fix, and requests landing on a warm session still run the old
+# code for up to the idle timeout. That is not a theory -- it happened on the
+# deploy before this line existed, and produced a "failure" in a check that
+# had already been fixed and verified locally.
+#
+# Updating any environment variable on the function replaces its execution
+# environments, which drops the module-level session id with them, so the
+# next request opens a session on the new version. Stamping the version in
+# makes it a visible record of which runtime the proxy was last pointed at.
+recycle_proxy() {
+  local ver="$1"
+  aws lambda get-function --function-name ramco-pilot-proxy >/dev/null 2>&1 || return 0
+  local env
+  env=$(aws lambda get-function-configuration --function-name ramco-pilot-proxy \
+          --query 'Environment.Variables' --output json)
+  env=$(RUNTIME_VERSION="$ver" python3 -c '
+import json, os, sys
+e = json.load(sys.stdin)
+e["RUNTIME_VERSION"] = os.environ["RUNTIME_VERSION"]
+print(json.dumps({"Variables": e}))' <<<"$env")
+  aws lambda wait function-updated --function-name ramco-pilot-proxy
+  aws lambda update-function-configuration --function-name ramco-pilot-proxy \
+    --environment "$env" --query LastUpdateStatus --output text >/dev/null
+  aws lambda wait function-updated --function-name ramco-pilot-proxy
+  echo "  proxy recycled onto runtime version $ver"
+}
+
 echo -n "waiting for READY"
 for _ in $(seq 1 60); do
   S=$(aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$ID" --query status --output text)
@@ -119,6 +150,9 @@ for _ in $(seq 1 60); do
   case "$S" in *FAILED*) echo " -> $S"; aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$ID"; exit 1;; esac
   echo -n "."; sleep 5
 done
+
+recycle_proxy "$(aws bedrock-agentcore-control get-agent-runtime \
+  --agent-runtime-id "$ID" --query agentRuntimeVersion --output text)"
 
 aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id "$ID" \
   --query '{arn:agentRuntimeArn,version:agentRuntimeVersion,status:status,net:networkConfiguration.networkMode}'

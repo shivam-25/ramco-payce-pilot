@@ -44,7 +44,7 @@ _PAST = _date_cls(2000, 1, 1)
 @dataclass
 class Chunk:
     strategy: str
-    source_type: str          # process | statutory | kb
+    source_type: str          # process | statutory | kb | known_issue
     source_id: str
     heading: str | None
     text: str
@@ -92,7 +92,8 @@ def _fixed(text: str, size: int = 512, overlap: int = 64) -> list[str]:
     return out
 
 
-def build(strategy: str, rules: list[dict], kb: list[dict]) -> list[Chunk]:
+def build(strategy: str, rules: list[dict], kb: list[dict],
+          issues: list[dict] | None = None) -> list[Chunk]:
     if strategy not in STRATEGIES:
         raise ValueError(strategy)
     chunks: list[Chunk] = []
@@ -206,6 +207,34 @@ def build(strategy: str, rules: list[dict], kb: list[dict]) -> list[Chunk]:
         chunks.append(Chunk(strategy, "kb", a["id"], a.get("topic"), text,
                             region=a.get("region", "ALL")))
 
+    # ---- known issues, from resolved engineering escalations ------------
+    # The 24 KB articles are index entries with no body, so the pilot can say
+    # an article exists and nothing more. The escalation tracker is the one
+    # place in this export that holds real written answers: 42 resolved
+    # issues with a human-written root cause. Indexing them is what lets the
+    # pilot answer "is this a known problem" instead of handing it to a
+    # person who will look up the same ticket.
+    #
+    # Three rules, all of which exist because this source is internal and the
+    # others are not:
+    #
+    # 1. Customer names are redacted. Three summaries name the customer who
+    #    hit the bug ("Kestrel: overtime computed twice"). Serving that to a
+    #    different customer would disclose that a named company had a payroll
+    #    defect. The redaction uses the same identity list as the PII gate,
+    #    so a name added there is covered here without a second edit.
+    # 2. Customer ids and linked ticket ids are not indexed at all. With the
+    #    names gone, what remains is a product defect description, which is
+    #    the same for everyone and belongs to no region -- hence region ALL.
+    # 3. Only resolved issues. An open issue's note is a plan, not an answer,
+    #    and "fix in 2.7.3, rollout pending" becomes a promise the moment it
+    #    reaches a customer. The drafting prompt already forbids promising a
+    #    date, but the cheaper control is not to put one in the corpus.
+    #
+    # effective_from is the day the issue was raised, so a question dated
+    # before it does not retrieve a defect that had not happened yet.
+    chunks.extend(known_issue_chunks(strategy, issues))
+
     return chunks
 
 
@@ -217,3 +246,29 @@ def _d(value):
         return value
     y, m, d = str(value).split("-")
     return _date(int(y), int(m), int(d))
+
+
+def known_issue_chunks(strategy: str, issues: list[dict] | None) -> list[Chunk]:
+    """Known-issue chunks on their own, with no disk access.
+
+    Separate from `build` because `build` reads the process documents from
+    the data room, and the deployed runtime does not have one -- the
+    packaging step leaves case data out of the artifact on purpose. The
+    ingest path runs inside the runtime, so it needs a builder that touches
+    nothing but its argument.
+    """
+    out: list[Chunk] = []
+    for j in issues or []:
+        note = (j.get("resolution_note") or "").strip()
+        text = (f"Known issue {j['key']} ({j.get('component')}, "
+                f"{j.get('issue_type')}, priority {j.get('priority')}, "
+                f"status {j.get('status')}): {j.get('summary')}. "
+                f"Resolution: {note}")
+        if strategy == "D_heading_context":
+            text = (f"[Resolved engineering issue {j['key']} — "
+                    f"component {j.get('component')}]\n{text}")
+        out.append(Chunk(strategy, "known_issue", j["key"],
+                            j.get("component"), text, region="ALL",
+                            effective_from=_d(str(j.get("created", ""))[:10])))
+
+    return out

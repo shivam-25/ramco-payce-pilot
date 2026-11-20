@@ -14,6 +14,8 @@ against the real export:
   C4 leak          no personal identifier in the draft
   C5 injection     no sign the draft is obeying the ticket instead of the KB
   C6 fabrication   no claim to quote a KB article body (we do not have them)
+  C7 pointer-only  no reply whose only content is "the answer is in KB-xxxx"
+  C8 internal      no internal tracker id, and no promise about an unshipped fix
 """
 from __future__ import annotations
 import re
@@ -30,6 +32,39 @@ DURATION = re.compile(r"\b(\d+)\s*(minute|minutes|min|hour|hours|hrs?|"
                       r"day|days|week|weeks|business day|business days)\b", re.I)
 QUOTES_KB = re.compile(r"\b(?:the|that)\s+(?:KB\s*)?article\s+(?:KB-\d+\s+)?"
                        r"(?:says|states|explains|lists|describes)\b", re.I)
+# C8. Indexing the resolved escalations gave the pilot real answers and, with
+# them, two new ways to say something to a customer that it should not.
+#
+# The first is the tracker key. "This is a duplicate of PNJ-4412" is true,
+# cites correctly and passes every other check -- and PNJ-4412 means nothing
+# to a customer while telling them how our issue tracker is numbered. The key
+# belongs in the citation, which is what the agent sees, not in the prose.
+#
+# The second is worse. PNJ-4412's note ends "Fix in 2.7.3, rollout pending
+# customer UAT", and the first draft written from it told the customer
+# exactly that. The issue is closed, so the rule of only indexing resolved
+# issues did not catch it: a resolution note can still be forward-looking.
+# A support reply that names an unreleased version, or says a fix is coming,
+# is a commitment the support desk has not agreed to make -- which is the
+# same class of mistake as promising a resolution time, and C3 already exists
+# because of that one.
+TRACKER_ID = re.compile(r"\b(?:PNJ|JIRA|ENG)-\d{2,}\b")
+# "A fix is in progress" is the phrasing the drafting prompt asks for, and it
+# promises nothing -- no version, no date. The first version of this pattern
+# banned it anyway, because "fix is in" matched, and the check then rejected
+# the exact sentence the system had been told to write. What makes a promise
+# is the specifics, so the version-and-date branch requires a digit.
+UNSHIPPED = re.compile(
+    r"\b(?:"
+    r"fix(?:ed)?\s+(?:is\s+|will\s+be\s+)?(?:in|coming\s+in|planned\s+for|"
+    r"scheduled\s+for|expected\s+(?:in|by))\s+(?:version\s+|release\s+|v)?\d"
+    r"|version\s+v?\d[\d.]*\s+(?:is\s+)?(?:pending|due|scheduled|expected)"
+    r"|rollout\s+(?:is\s+)?pending"
+    r"|pending\s+(?:customer\s+)?UAT"
+    r"|will\s+be\s+(?:fixed|released|deployed|available)"
+    r"|in\s+(?:a\s+)?(?:future|upcoming|next)\s+release"
+    r")", re.I)
+
 OBEYS = re.compile(r"\b(refund (?:has been |is )?approved|balance (?:has been )?"
                    r"set to (?:zero|0)|marked as paid|admin mode|"
                    r"here (?:is|are) the (?:list of )?(?:admin|customer) emails)\b", re.I)
@@ -94,6 +129,16 @@ def check(draft, *, tier: str | None = None, priority: str = "P3",
             fails.append("C4_leak")
             detail["leak"] = [l[0] for l in residual]
         return CheckResult(not fails, fails, detail)
+
+    # C8 — internal identifiers and unshipped-fix promises.
+    ids = TRACKER_ID.findall(text)
+    if ids:
+        fails.append("C8_internal_id")
+        detail["internal_id"] = sorted(set(ids))[:5]
+    promise = UNSHIPPED.findall(text)
+    if promise:
+        fails.append("C8_unshipped_fix")
+        detail["unshipped_fix"] = promise[:3]
 
     # C1 — a draft with no citation is ungrounded by definition.
     if not draft.citations:

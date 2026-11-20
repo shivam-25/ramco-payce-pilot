@@ -45,6 +45,13 @@ class Invocation(BaseModel):
     # corpus can only happen in here, while scoring the drafts needs no
     # database and stays outside.
     eval_answer: list[dict] | None = None
+
+    # Resolved engineering escalations to index as a "known issue" source.
+    # Sent as a payload rather than read from disk because the deployment
+    # artifact deliberately carries no case data, and reachable only by a
+    # direct invoke with AWS credentials -- the public proxy drops this field
+    # along with every other one it does not whitelist.
+    ingest_known_issues: list[dict] | None = None
     eval_draft_model: str | None = None
 
 
@@ -98,6 +105,52 @@ def _strip_superseded() -> dict:
             cleared = conn.execute("DELETE FROM answer_cache").rowcount
             done[region] = {"chunks_rewritten": n, "cache_entries_cleared": cleared}
     return {"admin": "strip_superseded", "regions": done}
+
+
+def _ingest_known_issues(issues: list[dict]) -> dict:
+    """Index resolved escalations under every chunking strategy, in both
+    regions, replacing whatever was there before.
+
+    Replacing rather than appending keeps this re-runnable: the tracker is a
+    live system, so this will be run again, and an append would silently
+    double every issue. The delete is scoped to source_type so the statutory
+    and process corpus is untouched -- those took a full re-embed to build
+    and nothing here should put them at risk.
+    """
+    from .db import connect
+    from .chunking import known_issue_chunks, STRATEGIES
+    from .bedrock import embed_many
+    from .config import REGIONS
+
+    done = {}
+    for region in REGIONS:
+        with connect(region) as conn:
+            conn.execute("DELETE FROM doc_chunks WHERE source_type = %s",
+                         ("known_issue",))
+            n = 0
+            for strategy in STRATEGIES:
+                chunks = known_issue_chunks(strategy, issues)
+                if not chunks:
+                    continue
+                vectors, _ = embed_many([c.text for c in chunks])
+                conn.cursor().executemany(
+                    "INSERT INTO doc_chunks (strategy,source_type,source_id,"
+                    "heading,text,region,effective_from,effective_to,"
+                    "token_estimate,embedding) VALUES "
+                    "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    [(c.strategy, c.source_type, c.source_id, c.heading,
+                      c.text, c.region, c.effective_from, c.effective_to,
+                      c.tokens, v) for c, v in zip(chunks, vectors)])
+                n += len(chunks)
+            # A new source can answer questions the cache already has a
+            # withheld or escalated answer for, so the cache has to go.
+            conn.execute("DELETE FROM answer_cache")
+            total = conn.execute(
+                "SELECT count(*) AS n FROM doc_chunks WHERE source_type=%s",
+                ("known_issue",)).fetchone()["n"]
+            done[region] = {"inserted": n, "known_issue_chunks": total}
+    return {"admin": "ingest_known_issues", "issues": len(issues),
+            "regions": done}
 
 
 def _answer_set(questions: list[dict], draft_model: str | None) -> dict:
@@ -187,6 +240,9 @@ def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
 def invocations(payload: Invocation) -> dict:
     if payload.admin == "strip_superseded":
         return _strip_superseded()
+
+    if payload.ingest_known_issues is not None:
+        return _ingest_known_issues(payload.ingest_known_issues)
 
     if payload.eval_answer is not None:
         return _answer_set(payload.eval_answer, payload.eval_draft_model)
