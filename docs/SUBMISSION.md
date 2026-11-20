@@ -1,6 +1,6 @@
-**Submission: [your name]** · **Cloud and model used:** AWS `ap-southeast-2` · Amazon Nova Micro (classify), Nova Pro (draft + Ragas judge), Titan Embed v2 @ 512 dims
+**Submission: Shivam** · **Cloud and model used:** AWS `ap-southeast-2` · Amazon Nova Micro (classify), Nova Pro (draft + Ragas judge), Titan Embed v2 @ 512 dims
 
-Repo: [link] · Live pilot: `ramco-payce-pilot.vercel.app` · Deck + full results: `docs/RESULTS.md`
+Repo: https://github.com/shivam-25/ramco-payce-pilot · Live pilot: `ramco-payce-pilot.vercel.app` · Deck + full results: `docs/RESULTS.md`
 
 ---
 
