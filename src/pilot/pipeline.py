@@ -61,6 +61,10 @@ class Result:
     # removed is worth less than being able to see what was left.
     masked_text: str = ""
     cache_hit: bool = False
+    # How close the reused question was, when one was reused. Returned as a
+    # number because the console shows it, and parsing it back out of the
+    # reason string is how a display quietly drifts from the decision.
+    similarity: float | None = None
     timings_ms: dict = field(default_factory=dict)
     usd: float = 0.0
     sla_hours: tuple | None = None
@@ -344,6 +348,7 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
                 res.citations = hit.citations
                 res.sources = hit.sources or []
                 res.reason = f"semantic cache hit at {hit.similarity:.3f}"
+                res.similarity = round(float(hit.similarity), 4)
                 res.timings_ms = {k: round(v, 1) for k, v in t.items()}
                 res.usd = meter.usd
                 _audit(conn, ticket.ticket_id, "cache_hit",

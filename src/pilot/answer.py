@@ -227,7 +227,17 @@ def answer(conn, question: str, *, region: str, as_of: date,
         # they are not citations either. Carrying them would have counted a
         # refusal as a cited reply.
         why = re.sub(r"\bESCALATE\b", "", text, flags=re.I)
-        why = re.sub(r"\s+", " ", why).strip(" .")
+        # A non-English ticket is drafted bilingually, so a refusal can come
+        # back in both halves. The agent reading this line is the one who
+        # has to act on it, so prefer the English half when the model gave
+        # one. The instruction asks for English outright; this is the
+        # backstop for when it answers in the customer's language anyway,
+        # and it beats showing an Arabic sentence to an agent who cannot
+        # read it and calling that an explanation.
+        if lang != "en":
+            customer_half, english_half = split_bilingual(why, lang)
+            why = english_half or customer_half
+        why = re.sub(r"\s+", " ", why).strip(" .-")
         return Draft(text="", citations=[], passages=hits, escalate=True,
                      usage=usage, language=lang,
                      extra_usage=[u for u in (lang_usage,) if u],

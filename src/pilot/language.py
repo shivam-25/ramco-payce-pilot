@@ -112,7 +112,10 @@ def reply_instruction(lang: str) -> str:
             f"Keep identifiers, amounts, dates and the [1] style citation "
             f"markers exactly as the passages write them, in both halves. "
             f"If you cannot answer, write the English word ESCALATE on its "
-            f"own line and write nothing else.")
+            f"own line and then say IN ENGLISH what is missing. That "
+            f"explanation is read by the support agent who picks the ticket "
+            f"up, never by the customer, and it is never sent, so it is "
+            f"English regardless of what the customer wrote.")
 
 
 def split_bilingual(text: str, lang: str) -> tuple[str, str]:

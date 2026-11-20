@@ -19,7 +19,7 @@ type Run = {
   sources?: { sim?: number; heading?: string; snippet?: string;
               source_id?: string; effective_from?: string;
               effective_to?: string }[];
-  priority?: string; cost?: { usd: number; by_model: Record<string,
+  priority?: string; similarity?: number; cost?: { usd: number; by_model: Record<string,
     { calls: number; in: number; out: number; usd: number }> };
   output_check?: Record<string, string>; timings_ms?: Record<string, number>;
   pii_counts?: Record<string, number>; cache_hit?: boolean;
@@ -146,9 +146,14 @@ export default function Detail({ id, onBack, onChanged }:
         <div className="dbadges">
           <span className={`dpill ${t.state}`}>
             {t.state === "resolved" ? "Resolved" : "Open"}</span>
-          <span className={`dpill pri ${t.priority}`}>{t.priority}</span>
+          {!!txt(t.priority) &&
+            <span className={`dpill pri ${t.priority}`}>{txt(t.priority)}</span>}
           {run?.route && <span className="dpill">{run.route === "answer"
-            ? "Auto answer" : "Needs a person"}</span>}
+            ? "Auto answer" : run.route === "cache"
+            ? "Reused answer" : "Needs a person"}</span>}
+          {run?.cache_hit !== undefined && (
+            <span className={`dpill ${run.cache_hit ? "cached" : "fresh"}`}>
+              {run.cache_hit ? "From cache" : "Freshly drafted"}</span>)}
         </div>
       </div>
 
@@ -211,7 +216,20 @@ export default function Detail({ id, onBack, onChanged }:
 
           {run?.draft ? (
             <article className="dmsg bot">
-              <p className="dwho">Drafted reply · not sent</p>
+              <p className="dwho">
+                {run.cache_hit
+                  ? "Reused from an earlier answer · not sent"
+                  : "Drafted reply · not sent"}</p>
+              {run.cache_hit && (
+                <p className="dreuse">
+                  This was not written again. An earlier answer to the same
+                  question, in force for the same period, was reused
+                  {typeof run.similarity === "number"
+                    ? ` at ${run.similarity.toFixed(3)} similarity` : ""}
+                  {" "}— which is why it cost ${(run.usd ?? 0).toFixed(6)}
+                  {" "}instead of roughly $0.0007, and why it returned in
+                  about a second instead of five.
+                </p>)}
               <p className="dbody">{txt(run.draft)}</p>
               {!!run.sources?.length && (
                 <ul className="dsrc">

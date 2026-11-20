@@ -68,6 +68,33 @@ def passage_sources(passages, citations) -> list:
             for h in passages if h.source_id in cited]
 
 
+# Bumped whenever an output check is added or tightened.
+#
+# A cached answer passed the checks that existed when it was stored, and
+# then it is served without being checked again -- which is correct, until
+# the checks change. C10 was added because a draft claimed the product
+# could not export payslips in bulk; the draft that prompted the check was
+# already in the cache, so the new check could not see it and the same
+# wrong answer kept being served instantly and for free.
+#
+# Rather than purge the cache, entries below the current version are simply
+# not eligible. Each such question is drafted once more, re-checked against
+# the current rules, and stored at the new version: the same self-healing
+# the sources column does. An answer that no longer passes is never stored,
+# so it leaves the cache by not coming back.
+CHECKS_VERSION = 2
+
+
+def _ensure_checks_version(conn) -> None:
+    """Rows written before this column predate C10. They default to 1, which
+    is below CHECKS_VERSION, so they stop being served and get redrafted."""
+    try:
+        conn.execute("ALTER TABLE answer_cache ADD COLUMN IF NOT EXISTS "
+                     "checks_version integer NOT NULL DEFAULT 1")
+    except Exception:
+        pass
+
+
 def _ensure_sources_column(conn) -> None:
     """Older rows predate this column. Adding it is cheap and idempotent,
     and failing to add it must cost the citation detail, not the answer."""
@@ -81,6 +108,7 @@ def lookup(conn, question: str, region: str, as_of: date | None = None,
            threshold: float = CACHE_THRESHOLD) -> tuple[CacheHit | None, Usage]:
     vector, usage = embed(question)
     _ensure_sources_column(conn)
+    _ensure_checks_version(conn)
     row = conn.execute(
         """
         SELECT cache_id, answer, citations, sources, as_of, valid_from, valid_to,
@@ -96,12 +124,17 @@ def lookup(conn, question: str, region: str, as_of: date | None = None,
            -- cache has healed itself. The alternative is serving markers
            -- that open onto nothing, forever.
            AND sources IS NOT NULL
+           -- Checked in SQL for the same reason the date window is: an
+           -- entry that predates the current checks must not even be the
+           -- nearest neighbour.
+           AND checks_version >= %s
            AND (%s::date IS NULL
                 OR ((valid_from IS NULL OR valid_from <= %s::date)
                 AND (valid_to   IS NULL OR valid_to   >  %s::date)))
          ORDER BY embedding <=> %s::vector
          LIMIT 1
-        """, (vector, region, as_of, as_of, as_of, vector)).fetchone()
+        """, (vector, region, CHECKS_VERSION, as_of, as_of, as_of,
+              vector)).fetchone()
     if not row or float(row["similarity"]) < threshold:
         return None, usage
     conn.execute("UPDATE answer_cache SET hits = hits + 1 WHERE cache_id = %s",
@@ -119,10 +152,11 @@ def store(conn, question: str, region: str, answer: str,
     vector, _ = embed(question)
     valid_from, valid_to = window_for(passages)
     _ensure_sources_column(conn)
+    _ensure_checks_version(conn)
     conn.execute(
         "INSERT INTO answer_cache (region, question, embedding, answer, "
-        "citations, sources, as_of, valid_from, valid_to) "
-        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        "citations, sources, as_of, valid_from, valid_to, checks_version) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (region, question, vector, answer, json.dumps(citations),
          json.dumps(passage_sources(passages, citations)),
-         as_of, valid_from, valid_to))
+         as_of, valid_from, valid_to, CHECKS_VERSION))

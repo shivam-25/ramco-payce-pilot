@@ -542,3 +542,8 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .kstub { color: #E8A33D; font-size: 11.5px; }
 .dmodel { display: block; font-family: var(--mono); font-size: 11px;
           color: var(--ink); }
+.dpill.cached { color: var(--good, #3ECF8E); border-color: currentColor; }
+.dpill.fresh { color: var(--dim); }
+.dreuse { margin: 0 0 8px; font-size: 11.5px; line-height: 1.6;
+          color: var(--dim); border-left: 2px solid var(--good, #3ECF8E);
+          padding-left: 9px; }
