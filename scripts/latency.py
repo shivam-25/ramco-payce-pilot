@@ -82,7 +82,11 @@ def _pipeline_s(body: dict) -> float:
 def run_direct(n: int, reuse: bool, pace: float) -> list[dict]:
     import boto3
     arn = os.environ["RUNTIME_ARN"]
-    client = boto3.client("bedrock-agentcore")
+    # Explicit, rather than relying on which of AWS_REGION or
+    # AWS_DEFAULT_REGION this botocore reads. The account's SCP allows one
+    # region anyway, so there is nothing to choose.
+    region = os.environ.get("AWS_REGION") or "ap-southeast-2"
+    client = boto3.client("bedrock-agentcore", region_name=region)
     fixed = str(uuid.uuid4())
     rows = []
     for i in range(n):

@@ -10,7 +10,12 @@ export type Result = {
   priority: string | null; case_id: string | null;
   case_size?: number; incident?: boolean;
   draft: string; citations: string[]; sources?: Source[];
-  needs_approval: boolean; output_check: Record<string, string>;
+  needs_approval: boolean;
+  // What the pipeline actually sends: {passed, failures, detail}. It was
+  // typed Record<string,string>, which made `passed` a string and quietly
+  // allowed the code reading it to be wrong.
+  output_check: { passed?: boolean; failures?: string[];
+                  detail?: Record<string, unknown> };
   pii_counts: Record<string, number>; cache_hit: boolean;
   timings_ms: Record<string, number>; usd: number;
   sla_hours: [number, number] | null;
@@ -34,11 +39,23 @@ export function status(r: Result): Status {
   if (r.reason?.includes("injection"))
     return { label: "Refused", tone: "bad",
              line: "This ticket tried to give the assistant instructions. Nothing was run." };
-  if (r.needs_approval)
+  // `needs_approval` means "a person must sign this off", which the pipeline
+  // sets on EVERY hand-off: money, yes, but also a model that declined, a
+  // draft nothing supported, and a draft the output check withheld. Reading
+  // it as a synonym for money captioned all four "Money is involved", and
+  // put that sentence under a ticket asking for a contribution rate. It also
+  // made the whole branch below unreachable, so the plain-language reasons
+  // written for those cases had never once been shown.
+  //
+  // The money hand-off is the one the router names, so test for that.
+  if (r.needs_approval && /money/i.test(r.reason || ""))
     return { label: "Needs you", tone: "warn",
              line: "Money is involved, so a person decides." };
   if (r.route === "human") {
-    const withheld = Object.keys(r.output_check || {}).length > 0;
+    // The output check ran and failed — a reply exists but was held back.
+    // Presence of the object is not enough: it is also present on replies
+    // that passed.
+    const withheld = r.output_check?.passed === false;
     return { label: "Needs you", tone: "warn",
              line: withheld
                ? "A reply was written but it did not answer the question, so it was held back."

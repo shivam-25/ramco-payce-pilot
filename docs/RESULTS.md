@@ -109,6 +109,49 @@ the runtime warm, or drop the Lambda hop and let API Gateway reach AgentCore
 directly. Neither is attempted here, and a faster prompt would not move this
 number by a tenth of a second.
 
+### Later: keeping it warm, and why the gate now passes
+
+"Keep the runtime warm" turned out to name one line. The proxy Lambda called
+`invoke_agent_runtime` with `runtimeSessionId=str(uuid.uuid4())` — a fresh
+id per request. AgentCore routes same-session invokes to the same microVM and
+holds it through 15 minutes of idle, so a new id every time *guarantees* a
+miss. Every request paid a full cold start: interpreter, boto3 and psycopg
+imports, a Secrets Manager fetch for the database password, a new Postgres
+connection, and a full read of the customer table — all before box 1.
+
+Measuring it first was worth doing, because the obvious change measured as
+doing nothing at all:
+
+| arm (old runtime) | wall p50 | pipeline p50 | overhead p50 |
+|---|---|---|---|
+| fresh session id per request | 5.54 s | 1.42 s | 4.22 s |
+| one session id, reused | 5.55 s | 5.02 s | **0.44 s** |
+
+Session reuse removed the cold start exactly as predicted — 4.22 s to 0.44 s
+— and the wall clock did not move, because the saving was consumed by the
+pipeline getting slower by the same amount. That second number is the rate
+limiter: a fresh microVM starts with an empty token bucket, a reused one
+inherits the previous request's reservation. At a 2 s pace that is a ~5.5 s
+wait, and 5.02 s is what it measured.
+
+So the two fixes only pay off together. The limiter is eval scaffolding and
+is now off outside a sweep; with both in place, through the public endpoint:
+
+| | before | after |
+|---|---|---|
+| wall p50 | 5.50 s | **2.05 s** |
+| **wall p95** | **6.17 s** | **2.51 s** |
+| pipeline p50 / p95 | 1.28 / 1.43 s | 0.82 / 1.08 s |
+| overhead p50 / p95 | 4.26 / 4.79 s | 1.17 / 1.46 s |
+
+**G7's latency target is met: 2.51 s at p95 against a 3 s mark**, from a 19 s
+vendor baseline. The pipeline also got faster — the question's embedding is
+now computed alongside the classifier rather than after it, and the limiter
+no longer sleeps in production.
+
+The measurement is in `scripts/latency.py`, so it reruns rather than being a
+number I once saw.
+
 ## Chunking and retrieval, chosen by measurement
 
 35 golden questions, k=5, scored with set arithmetic rather than a judge
