@@ -679,3 +679,52 @@ distinct texts are not independent. The point estimate is a fair measure of
 accuracy over the ticket *stream*, which is what production sees; the
 interval is narrower than the evidence supports.
 
+## G5 re-run: 0.789, and the judge got one demonstrably wrong
+
+Re-run through the deployed runtime with the known-issue corpus in place,
+Nova Pro drafting, 35 golden questions, all 28 sent answers scored:
+
+| | before | now |
+|---|---|---|
+| faithfulness | 0.814 | **0.789** |
+| answer relevancy | — | 0.831 |
+| context precision | 0.89 | 0.896 |
+| context recall | 0.93 | 0.893 |
+| sent | — | 28/30 answerable (2 withheld by the output check) |
+
+Still short of 0.90, and slightly worse than before. Two rows scored 0.0 and
+they fail for opposite reasons.
+
+**ABS-04 is a real defect, and I caused it.** Asked why a specific salary
+payment was not credited, retrieval returned SLA service credits, the UAE
+gratuity rule and the P1 definition — nothing about the payment. The model
+answered from a tracker note anyway: *"The cause of the issue is known and a
+fix is in progress."* No retrieved passage supports that, so faithfulness 0.0
+is correct. The sentence is also the exact wording C8 pushes the model
+toward: told not to name a version or a date, it emits a progress claim it
+cannot ground. The leak fix traded a disclosure risk for an unsupported
+assertion, and Ragas caught the trade. The honest repair is for an
+ungroundable known-issue answer to escalate rather than reassure.
+
+**PF-SEPT is the judge being wrong.** The question is September's EPF wage
+ceiling. The retrieved passage reads *"The value in force is: INR 25,000 per
+month"*; the answer reads "INR 25,000 per month" with that citation. It is
+the central question of the whole pilot and it is exactly right. Ragas scored
+it 0.0.
+
+That matters more than the mean. The judge is `apac.amazon.nova-pro-v1:0` and
+so is the drafter — the same model grades its own work, because Claude is
+blocked on this account and the design called for a judge a class above the
+writer. Until that form is approved, 0.789 is a number with a known broken
+instrument behind it, and the per-row detail is the only part worth trusting.
+A metric that marks the correct answer to the founding question as a
+fabrication should not be reported as a bare mean, so the rows are in
+`evals/reports/g5_ragas_detail.json`.
+
+Retrieval is not the suspect. On the same golden set, document-level recall@5
+is **30/30** and MRR@5 is **0.973** — the right document is at rank 1 almost
+every time, and known-issue chunks take only 12% of top-5 slots. There is
+roughly 0.03 of MRR available in total, so a cross-encoder reranker, a
+pre-filter or a parent-child chunking change would be optimising a stage that
+is not losing anything. The loss is in generation and in corpus coverage.
+
