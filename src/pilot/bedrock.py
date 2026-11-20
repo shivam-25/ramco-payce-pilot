@@ -226,6 +226,42 @@ def converse(model: str, prompt: str, system: str | None = None,
     return text, Usage(model, u.get("inputTokens", 0), u.get("outputTokens", 0), dt)
 
 
+
+def converse_stream(model: str, prompt: str, system: str | None = None,
+                    max_tokens: int = 512, temperature: float = 0.0):
+    """The same one turn, yielding text as the model writes it.
+
+    Yields ("text", chunk) repeatedly and finally ("done", (full, Usage)).
+    The caller gets the identical string `converse` would have returned, so
+    nothing downstream -- citation parsing, the output check -- has to know
+    which path produced it. Retries wrap establishing the stream only: once
+    tokens are flowing a retry would replay text the caller already has.
+    """
+    kwargs = {
+        "modelId": model,
+        "messages": [{"role": "user", "content": [{"text": prompt}]}],
+        "inferenceConfig": {"maxTokens": max_tokens, "temperature": temperature},
+    }
+    if system:
+        kwargs["system"] = [{"text": system}]
+    t0 = time.perf_counter()
+    r = _with_backoff(
+        lambda: _client("bedrock-runtime").converse_stream(**kwargs), model)
+    parts: list[str] = []
+    tin = tout = 0
+    for event in r["stream"]:
+        if "contentBlockDelta" in event:
+            piece = event["contentBlockDelta"]["delta"].get("text", "")
+            if piece:
+                parts.append(piece)
+                yield "text", piece
+        elif "metadata" in event:
+            u = event["metadata"].get("usage", {})
+            tin = u.get("inputTokens", 0)
+            tout = u.get("outputTokens", 0)
+    dt = time.perf_counter() - t0
+    yield "done", ("".join(parts), Usage(model, tin, tout, dt))
+
 # Content-addressed: a key is a text and its value is that same text's own
 # vector, so a hit can only ever return what the caller asked to embed.
 #

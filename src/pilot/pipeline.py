@@ -8,7 +8,7 @@ ran and the human approved, instead of asserting it in a policy document.
 """
 from __future__ import annotations
 import json, threading, time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from datetime import date, datetime, timezone
 
 from .bedrock import Meter, embed, limiter_enabled
@@ -93,19 +93,40 @@ def _audit(conn, ticket_id, stage, detail):
         pass        # auditing must never take the pipeline down
 
 
+def _pii_note(counts: dict) -> str:
+    """What the gate removed, in the words the console shows an agent."""
+    if not counts:
+        return "nothing to remove"
+    nice = {"AADHAAR": "Aadhaar", "PAN": "PAN", "IBAN": "bank account",
+            "EMAIL": "email", "PHONE": "phone", "EMIRATES_ID": "Emirates ID"}
+    bits = [f"{v} {nice.get(k, k.lower())}" for k, v in sorted(counts.items())]
+    return ", ".join(bits) + " hidden"
+
+
 def run_ticket(raw: dict, *, as_of: date | None = None,
                chunk_strategy: str = DEFAULT_CHUNKING,
                retrieval_strategy: str = DEFAULT_RETRIEVAL,
                use_cache: bool = True,
-               meter: Meter | None = None) -> Result:
+               meter: Meter | None = None,
+               on_event=None) -> Result:
+    """`on_event`, when given, is called as each box finishes and as the
+    draft is written. It is the only difference between the streamed and the
+    buffered path: there is one pipeline, and the console watching it live
+    sees exactly the run that the batch evals score."""
     meter = meter or Meter()
     t: dict[str, float] = {}
     clock = time.perf_counter
+
+    def emit(event: str, **kw) -> None:
+        if on_event is not None:
+            on_event({"event": event, **kw})
 
     # ---- box 1: PII gate. Before everything. -------------------------
     t0 = clock()
     masked_raw, red = redact_ticket(raw, customer_names())
     t["pii"] = (clock() - t0) * 1000
+    emit("stage", box="pii gate", ms=round(t["pii"], 1),
+         note=_pii_note(red.counts))
     # Assert the gate here, not only in the test, and on exactly what the
     # pipeline is about to hand downstream. Structured ids and timestamps are
     # not free text: a ticket reference like UI-20261119105424 is fourteen
@@ -118,6 +139,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     t0 = clock()
     ticket = normalise(masked_raw)
     t["normalise"] = (clock() - t0) * 1000
+    emit("stage", box="normalise", ms=round(t["normalise"], 1),
+         note=f"{ticket.channel} schema")
     text = f"{ticket.subject}\n{ticket.body}".strip()
     as_of = as_of or (ticket.received_at.date() if ticket.received_at
                       else datetime.now(timezone.utc).date())
@@ -126,6 +149,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     t0 = clock()
     ticket, resolved = enrich(ticket)
     t["lookup"] = (clock() - t0) * 1000
+    emit("stage", box="lookup", ms=round(t["lookup"], 1),
+         note=f"{ticket.region} \u00b7 {ticket.tier}" if ticket.region else "not on file")
 
     # The question's embedding depends on nothing the next two boxes produce,
     # and three later steps all need it: the cache lookup, retrieval, and the
@@ -162,6 +187,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     t0 = clock()
     blocked, reasons = screen(text)
     t["injection"] = (clock() - t0) * 1000
+    emit("stage", box="injection", ms=round(t["injection"], 1),
+         note="blocked" if blocked else "clean")
 
     # ---- box 4: classify ----------------------------------------------
     queue = None
@@ -170,6 +197,7 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
         _, queue, usage = classify(text)
         meter.add(usage)
         t["classify"] = (clock() - t0) * 1000
+        emit("stage", box="classify", ms=round(t["classify"], 1), note=queue or "")
     res.queue = queue
 
     # ---- box 6: router -------------------------------------------------
@@ -179,6 +207,7 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
                       injection_reasons=reasons,
                       received_at=ticket.received_at)
     t["router"] = (clock() - t0) * 1000
+    emit("stage", box="router", ms=round(t["router"], 1), note=res.route)
     res.route = decision.route.value
     res.reason = decision.reason
     res.needs_approval = decision.needs_approval
@@ -219,6 +248,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
         res.case_size = record_and_count(conn, res.case_id, ticket.ticket_id)
         res.incident = res.case_size >= INCIDENT_AT
         t["dedupe"] = (clock() - t0) * 1000
+        emit("stage", box="dedupe", ms=round(t["dedupe"], 1),
+             note=f"{res.case_size} in case" if res.case_size else "")
         if res.incident:
             _audit(conn, ticket.ticket_id, "incident_declared",
                    {"case_id": res.case_id, "tickets": res.case_size})
@@ -236,6 +267,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
             hit, usage = cache_lookup(conn, text, ticket.region, as_of=as_of)
             meter.add(usage)
             t["cache"] = (clock() - t0) * 1000
+            emit("stage", box="cache", ms=round(t["cache"], 1),
+                 note="hit" if hit else "miss")
             if hit:
                 res.cache_hit = True
                 res.route = Route.CACHE.value
@@ -252,7 +285,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
         t0 = clock()
         d = draft_answer(conn, text, region=ticket.region, as_of=as_of,
                          chunk_strategy=chunk_strategy,
-                         retrieval_strategy=retrieval_strategy)
+                         retrieval_strategy=retrieval_strategy,
+                         on_event=on_event)
         if d.usage:
             meter.add(d.usage)
         t["answer"] = (clock() - t0) * 1000
@@ -271,6 +305,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
         verdict = check(d, tier=ticket.tier, priority=ticket.priority,
                         payroll_week=in_payroll_week(ticket.received_at))
         t["output_check"] = (clock() - t0) * 1000
+        emit("stage", box="output check", ms=round(t["output_check"], 1),
+             note="passed" if verdict.passed else ", ".join(verdict.failures))
         res.output_check = {"passed": verdict.passed,
                             "failures": verdict.failures,
                             "detail": verdict.detail}
@@ -296,3 +332,36 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
     res.timings_ms = {k: round(v, 1) for k, v in t.items()}
     res.usd = meter.usd
     return res
+
+
+def stream_ticket(raw: dict, **kw):
+    """`run_ticket` as a generator of events, for a console watching live.
+
+    The pipeline is unchanged and runs on a worker thread; this only turns
+    the `on_event` callback into something a caller can iterate. Doing it
+    this way rather than rewriting the pipeline as a generator keeps one
+    implementation: the streamed run and the run the evals score are the
+    same code, so the console cannot drift away from the measured pilot.
+
+    The final event is always `result` (or `error`), so a consumer can stop
+    on it without tracking which boxes it has seen.
+    """
+    import queue as _queue
+    q: "_queue.Queue[dict | None]" = _queue.Queue()
+
+    def worker() -> None:
+        try:
+            res = run_ticket(raw, on_event=q.put, **kw)
+            q.put({"event": "result", "result": asdict(res)})
+        except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+            q.put({"event": "error", "error": str(exc)[:300]})
+        finally:
+            q.put(None)
+
+    th = threading.Thread(target=worker, daemon=True)
+    th.start()
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        yield item

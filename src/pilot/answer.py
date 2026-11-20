@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from .bedrock import converse, Usage
+from .bedrock import converse, converse_stream, Usage
 from .config import DRAFT_MODEL, TOP_K
 from .chunking import STUB_MARKER
 from .retrieval import Hit, retrieve
@@ -125,9 +125,15 @@ def _format(hits: list[Hit], as_of: date) -> str:
 
 def answer(conn, question: str, *, region: str, as_of: date,
            chunk_strategy: str, retrieval_strategy: str,
-           k: int = TOP_K) -> Draft:
+           k: int = TOP_K, on_event=None) -> Draft:
+    def emit(event: str, **kw) -> None:
+        if on_event is not None:
+            on_event({"event": event, **kw})
+
     hits, embed_usage = retrieve(conn, chunk_strategy, retrieval_strategy,
                                  question, k=k, region=region, as_of=as_of)
+    emit("stage", box="retrieve", ms=None,
+         note=f"{len(hits)} passages" if hits else "nothing matched")
 
     # A KB index entry names an article and points at Confluence. There is
     # no body in it to ground an answer on, so it is not worth paying a
@@ -162,8 +168,23 @@ def answer(conn, question: str, *, region: str, as_of: date,
     prompt = (f"Question date: {as_of}\nCustomer region: {region}\n\n"
               f"Passages:\n{_format(hits, as_of)}\n\n"
               f"Support question:\n{question}")
-    text, usage = converse(DRAFT_MODEL, prompt, system=SYSTEM,
-                           max_tokens=400, temperature=0.0)
+    # Streaming and buffered differ only in how the same string arrives.
+    # When nobody is watching there is no reason to pay for the extra
+    # event plumbing, so the buffered call stays the default.
+    if on_event is None:
+        text, usage = converse(DRAFT_MODEL, prompt, system=SYSTEM,
+                               max_tokens=400, temperature=0.0)
+    else:
+        emit("draft_begin")
+        text, usage = "", None
+        for kind, payload in converse_stream(DRAFT_MODEL, prompt,
+                                             system=SYSTEM, max_tokens=400,
+                                             temperature=0.0):
+            if kind == "text":
+                emit("token", text=payload)
+            else:
+                text, usage = payload
+        emit("draft_end")
 
     if "ESCALATE" in text.upper():
         # When the model declines, what it wrote is an explanation for the

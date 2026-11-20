@@ -5,6 +5,7 @@ The same app runs locally with uvicorn, so what is tested locally is what is
 deployed — there is no second code path for the cloud.
 """
 from __future__ import annotations
+import json
 import os
 import re
 from datetime import date, datetime
@@ -27,6 +28,7 @@ class Invocation(BaseModel):
     customer_id: str | None = None
     as_of: str | None = None
     use_cache: bool = True
+    stream: bool = False
 
     # Retrieval sweep, used by the bake-off. The databases are private, so
     # the runtime inside the VPC is the only place this can run. It is not
@@ -237,7 +239,7 @@ def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
 
 
 @app.post("/invocations")
-def invocations(payload: Invocation) -> dict:
+def invocations(payload: Invocation):
     if payload.admin == "strip_superseded":
         return _strip_superseded()
 
@@ -253,6 +255,22 @@ def invocations(payload: Invocation) -> dict:
             payload.eval_strategies or ["R1_dense", "R2_lexical",
                                         "R3_hybrid", "R4_hybrid_dated"])
 
+    raw, as_of = _ticket_from(payload)
+
+    if payload.stream:
+        return _stream_response(raw, as_of, payload.use_cache)
+
+    meter = Meter()
+    result = run_ticket(raw, as_of=as_of, use_cache=payload.use_cache,
+                        chunk_strategy=os.environ.get("CHUNKING", DEFAULT_CHUNKING),
+                        retrieval_strategy=os.environ.get("RETRIEVAL", DEFAULT_RETRIEVAL),
+                        meter=meter)
+    out = result.to_dict()
+    out["cost"] = {"usd": round(meter.usd, 6), "by_model": meter.by_model()}
+    return out
+
+
+def _ticket_from(payload: "Invocation"):
     raw = payload.ticket or {
         "ticket_id": f"UI-{datetime.utcnow():%Y%m%d%H%M%S}",
         "channel": "email",
@@ -273,12 +291,34 @@ def invocations(payload: Invocation) -> dict:
     if payload.as_of:
         y, m, d = payload.as_of.split("-")
         as_of = date(int(y), int(m), int(d))
+    return raw, as_of
 
-    meter = Meter()
-    result = run_ticket(raw, as_of=as_of, use_cache=payload.use_cache,
-                        chunk_strategy=os.environ.get("CHUNKING", DEFAULT_CHUNKING),
-                        retrieval_strategy=os.environ.get("RETRIEVAL", DEFAULT_RETRIEVAL),
-                        meter=meter)
-    out = result.to_dict()
-    out["cost"] = {"usd": round(meter.usd, 6), "by_model": meter.by_model()}
-    return out
+
+def _stream_response(raw: dict, as_of, use_cache: bool):
+    """Server-sent events, one JSON object per event.
+
+    The buffered endpoint above is untouched and remains the path the evals
+    and the batch scripts use. This exists so a console can show the boxes
+    closing as they close, rather than a spinner for two and a half seconds.
+    """
+    from fastapi.responses import StreamingResponse
+    from .pipeline import stream_ticket
+
+    def body():
+        meter = Meter()
+        try:
+            for ev in stream_ticket(
+                    raw, as_of=as_of, use_cache=use_cache,
+                    chunk_strategy=os.environ.get("CHUNKING", DEFAULT_CHUNKING),
+                    retrieval_strategy=os.environ.get("RETRIEVAL", DEFAULT_RETRIEVAL),
+                    meter=meter):
+                if ev.get("event") == "result":
+                    ev["result"]["cost"] = {"usd": round(meter.usd, 6),
+                                            "by_model": meter.by_model()}
+                yield f"data: {json.dumps(ev, default=str)}\n\n"
+        except Exception as exc:  # noqa: BLE001
+            yield f"data: {json.dumps({'event': 'error', 'error': str(exc)[:300]})}\n\n"
+
+    return StreamingResponse(body(), media_type="text/event-stream",
+                             headers={"cache-control": "no-cache",
+                                      "x-accel-buffering": "no"})
