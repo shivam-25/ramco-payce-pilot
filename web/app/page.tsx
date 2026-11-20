@@ -389,8 +389,8 @@ export default function Console() {
               feel like a poster. */}
           {charts && <div className="charts">
             <Saved rows={rows} />
-            <Gauge pct={parseFloat(board.alone)} label="Handled without you"
-                   sub={`${board.drafted} of ${board.seen} needed nobody`} />
+            <Gauge pct={parseFloat(board.alone)} drafted={board.drafted}
+                   seen={board.seen} />
             <Split s={board} />
             <Speed rows={rows} />
           </div>}
