@@ -57,6 +57,31 @@ def _session() -> str:
     return _session_id
 
 
+def _authorised(given: str) -> bool:
+    """Either the shared secret itself, or a short-lived token signed with it.
+
+    The browser cannot hold the shared secret -- the page is public, and a
+    key visible in devtools is a key anyone can run the account's models
+    with. So Vercel mints a token that says only "someone who knows the
+    secret vouched for this, until T", and this verifies it. A leaked token
+    is worth at most the seconds left on its clock.
+
+    The raw secret is still accepted because the deploy scripts and the CLI
+    tests talk to this directly, and they hold it legitimately.
+    """
+    if hmac.compare_digest(given, API_KEY):
+        return True
+    try:
+        exp_s, sig = given.split(".", 1)
+        exp = int(exp_s)
+    except (ValueError, AttributeError):
+        return False
+    if exp < time.time():
+        return False
+    want = hmac.new(API_KEY.encode(), exp_s.encode(), "sha256").hexdigest()
+    return hmac.compare_digest(sig, want)
+
+
 def handler(event, _context):
     ctx = event.get("requestContext") or {}
     route = ctx.get("routeKey")
@@ -84,8 +109,7 @@ def handler(event, _context):
         push({"event": "error", "error": "body must be JSON"})
         return {"statusCode": 400}
 
-    # compare_digest, not ==, so the check does not leak the key by timing
-    if not hmac.compare_digest(str(payload.get("key", "")), API_KEY):
+    if not _authorised(str(payload.get("key", ""))):
         push({"event": "error", "error": "unauthorized"})
         return {"statusCode": 401}
 

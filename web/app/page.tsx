@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { TICKETS, BURST, type Demo } from "./lib/demo";
+import { TICKETS, BURST, type Demo, FEED } from "./lib/demo";
 import { status, withMarkers, period, pretty, pool, readable, heading, neutralise,
-         score, stale, type Row, type Result, type Source } from "./lib/types";
+         score, stale, type Row, type Result, type Source,
+         type Stage } from "./lib/types";
+import { streamTicket } from "./lib/stream";
 
 // What to call each identifier in front of an agent. "AADHAAR" is how the
 // gate reports it; "Aadhaar number" is what a person says.
@@ -45,19 +47,52 @@ export default function Console() {
   const [busy, setBusy] = useState(false);
   const [acted, setActed] = useState<Record<string, string>>({});
   const [writing, setWriting] = useState(false);
+  const [feeding, setFeeding] = useState(false);
+  const feedRef = useRef(false);
 
   const patch = (key: string, p: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)));
 
+  // Stage frames arrive between renders, so the callback cannot close over
+  // `rows` -- it would append to whatever the list was when the run started
+  // and drop every stage but the last.
+  const rowsRef = useRef<Row[]>(rows);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
+
+  // Streaming is an optimisation, never a dependency. If the token route,
+  // the socket or the Lambda is unhappy for any reason, this falls through
+  // to the buffered endpoint that has always worked, and the only visible
+  // difference is that the boxes do not light up on the way past.
+  async function runOne(row: Row, useCache = true): Promise<Result> {
+    try {
+      const t = await fetch("/api/stream-token", { cache: "no-store" });
+      if (!t.ok) throw new Error("no stream token");
+      const { url, token } = await t.json();
+      let live = "";
+      return await streamTicket(url, token, row, useCache, {
+        onStage: (st: Stage) =>
+          patch(row.key, { stages: [...(rowsRef.current.find(
+            (r) => r.key === row.key)?.stages ?? []), st] }),
+        onDraftBegin: () => patch(row.key, { live: "" }),
+        onToken: (text) => { live += text; patch(row.key, { live }); },
+      }).then((result) => { patch(row.key, { streamed: true }); return result; });
+    } catch {
+      return await triage(row, useCache);
+    }
+  }
+
   async function run(key: string) {
     const row = rows.find((r) => r.key === key);
     if (!row) return;
-    patch(key, { state: "running", result: undefined });
+    patch(key, { state: "running", result: undefined, stages: [], live: undefined,
+                 streamed: false });
     try {
-      const result = await triage(row);
-      patch(key, { state: result.error ? "failed" : "done", result });
+      const result = await runOne(row);
+      patch(key, { state: result.error ? "failed" : "done", result,
+                   live: undefined });
     } catch (e) {
-      patch(key, { state: "failed", result: { error: String(e) } as Result });
+      patch(key, { state: "failed", live: undefined,
+                   result: { error: String(e) } as Result });
     }
   }
 
@@ -66,6 +101,40 @@ export default function Console() {
     await pool(rows.filter((r) => r.state !== "done").map((r) => r.key), 4, run);
     setBusy(false);
   }
+
+  // The feed: tickets keep arriving until you stop them. One at a time and
+  // in order, because the point is to watch the pipeline decide differently
+  // on each one -- answer, money, injection, not-in-corpus -- and a parallel
+  // burst would just be a wall of spinners.
+  async function toggleFeed() {
+    if (feedRef.current) { feedRef.current = false; setFeeding(false); return; }
+    feedRef.current = true; setFeeding(true);
+    let n = 0;
+    while (feedRef.current) {
+      const d = FEED[n % FEED.length];
+      n += 1;
+      const key = `${d.id}-${n}`;
+      const row: Row = { key, subject: d.subject, body: d.body,
+                         customer: d.customer, asOf: d.asOf, note: d.note,
+                         state: "running" };
+      setRows((rs) => [...rs, row]);
+      setSel(key);
+      try {
+        const result = await runOne(row, false);
+        patch(key, { state: result.error ? "failed" : "done", result,
+                     live: undefined });
+      } catch (e) {
+        patch(key, { state: "failed", live: undefined,
+                     result: { error: String(e) } as Result });
+      }
+      if (!feedRef.current) break;
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+  }
+
+  // A feed left running after the tab is closed would keep billing the
+  // account for drafts nobody is watching.
+  useEffect(() => () => { feedRef.current = false; }, []);
 
   async function addRepeats() {
     const extra = BURST.map(mk).filter((b) => !rows.some((r) => r.key === b.key));
@@ -130,6 +199,10 @@ export default function Console() {
             {writing ? "Cancel" : "Write a ticket"}
           </button>
           <button className="ghost" onClick={addRepeats} disabled={busy}>Add repeat reports</button>
+          <button className={feeding ? "ghost on" : "ghost"} onClick={toggleFeed}
+                  disabled={busy}>
+            {feeding ? "Stop the feed" : "Start live feed"}
+          </button>
           <button className="primary" onClick={runAll} disabled={busy}>
             {busy ? "Working…" : "Draft all replies"}
           </button>
@@ -144,23 +217,6 @@ export default function Console() {
           same problem have arrived today. Raised automatically, on the fifth — today
           it takes a person about five hours to notice a pattern like this.
         </p>
-      )}
-
-      {board && (
-        <dl className="board">
-          <div><dt>Replies backed by a source</dt>
-               <dd className={board.cited === "100%" ? "good" : ""}>{board.cited}</dd>
-               <dfn>every answer shows where it came from &mdash; 48% do today</dfn></div>
-          <div><dt>Answers using an out-of-date rule</dt>
-               <dd className={board.stale === "0" ? "good" : "bad"}>{board.stale}</dd>
-               <dfn>none so far &mdash; this happened 48 times last quarter</dfn></div>
-          <div><dt>Cost per ticket</dt>
-               <dd className="good">{board.cost}</dd>
-               <dfn>what the desk spends today is $6.16</dfn></div>
-          <div><dt>Handled without you</dt>
-               <dd>{board.alone}</dd>
-               <dfn>the rest come to you, with the reason</dfn></div>
-        </dl>
       )}
 
       <div className="split">
@@ -209,7 +265,11 @@ export default function Console() {
             </div>
           </article>
 
-          {cur.state === "running" && <p className="waiting">Reading the rules…</p>}
+          {cur.state === "running" && (
+            (cur.stages?.length || cur.live !== undefined)
+              ? <Live row={cur} />
+              : <p className="waiting">Reading the rules…</p>
+          )}
 
           {cur.result && (
             <Reply row={cur} acted={acted[cur.key]}
@@ -220,6 +280,32 @@ export default function Console() {
           {cur.compare && <Compare row={cur} />}
         </section>
       </div>
+
+      {board && (
+        <footer className="scorebar">
+          <div className="tallies">
+            <span><b>{board.seen}</b> handled</span>
+            <span className="ok"><b>{board.drafted}</b> drafted</span>
+            <span className="warn"><b>{board.toPerson}</b> to you</span>
+            {board.refused > 0 && <span className="bad"><b>{board.refused}</b> refused</span>}
+            <span className="sp">{board.spend} spent</span>
+          </div>
+          <dl className="board">
+            <div><dt>Backed by a source</dt>
+                 <dd className={board.cited === "100%" ? "good" : ""}>{board.cited}</dd>
+                 <dfn>48% do today</dfn></div>
+            <div><dt>Out-of-date rule used</dt>
+                 <dd className={board.stale === "0" ? "good" : "bad"}>{board.stale}</dd>
+                 <dfn>48 times last quarter</dfn></div>
+            <div><dt>Cost per ticket</dt>
+                 <dd className="good">{board.cost}</dd>
+                 <dfn>the desk spends $6.03</dfn></div>
+            <div><dt>Handled without you</dt>
+                 <dd>{board.alone}</dd>
+                 <dfn>the rest carry a reason</dfn></div>
+          </dl>
+        </footer>
+      )}
     </main>
   );
 }
@@ -265,6 +351,38 @@ function Composer({ onSubmit }: {
         database can be chosen for it.
       </p>
     </form>
+  );
+}
+
+/** What the pipeline is doing, while it does it.
+ *
+ *  The draft streams in here and NOT into the reply area, because at this
+ *  point it has not been through C1-C9. If a check fails, this text is
+ *  withheld and replaced by the reason -- so the panel says plainly that
+ *  what you are reading is unchecked. The agent is staff, not the customer;
+ *  the promise this pilot makes is that nothing unchecked reaches the
+ *  customer, and approving is still a deliberate click afterwards.
+ */
+function Live({ row }: { row: Row }) {
+  return (
+    <section className="live">
+      <ol className="boxes">
+        {(row.stages ?? []).map((st, i) => (
+          <li key={i}>
+            <span className="bx">{st.box}</span>
+            <span className="bn">{st.note}</span>
+            {st.ms !== null && <span className="bm">{st.ms} ms</span>}
+          </li>
+        ))}
+        {row.live === undefined && <li className="pending"><span className="bx">…</span></li>}
+      </ol>
+      {row.live !== undefined && (
+        <div className="livedraft">
+          <p className="lhead">Writing — not checked yet</p>
+          <p className="ltext">{row.live}<span className="caret" /></p>
+        </div>
+      )}
+    </section>
   );
 }
 

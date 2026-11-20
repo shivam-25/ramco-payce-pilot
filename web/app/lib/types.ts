@@ -22,12 +22,22 @@ export type Result = {
   error?: string;
 };
 
+/** One box closing, as it closes. `ms` is the box's own time, not elapsed. */
+export type Stage = { box: string; ms: number | null; note: string };
+
 export type Row = {
   key: string; subject: string; body: string; customer: string;
   asOf: string; note: string; dated?: boolean;
   state: "idle" | "running" | "done" | "failed";
   result?: Result;
   compare?: { asOf: string; result?: Result; state: "running" | "done" };
+  // Only set while a run is streaming. `live` is the draft as it is being
+  // written, which has NOT been through the output check yet -- the screen
+  // has to say so, because a draft that fails C1-C9 is withheld and this
+  // text is then replaced by the reason.
+  stages?: Stage[];
+  live?: string;
+  streamed?: boolean;
 };
 
 export type Status = { label: string; tone: "ok" | "warn" | "bad"; line: string };
@@ -191,7 +201,14 @@ export function stale(r: Result, asOf: string): Source[] {
   });
 }
 
-export type Score = { cited: string; stale: string; cost: string; alone: string };
+export type Score = {
+  cited: string; stale: string; cost: string; alone: string;
+  // Counts as well as rates. Watching a feed arrive, "14 drafted, 6 to you,
+  // 2 refused" says more about what the desk is in for than four
+  // percentages, and a percentage over three tickets is noise in a suit.
+  seen: number; drafted: number; toPerson: number; refused: number;
+  spend: string;
+};
 
 /** The four day-one numbers from the brief, computed from what is on screen. */
 export function score(rows: Row[]): Score | null {
@@ -203,10 +220,16 @@ export function score(rows: Row[]): Score | null {
   const spend = done.reduce((a, r) => a + (r.result!.usd || 0), 0) / done.length;
   const alone = done.filter((r) => r.result!.route !== "human"
                                 && !r.result!.needs_approval).length;
+  const refused = done.filter((r) => /injection/i.test(r.result!.reason || "")).length;
   return {
     cited: answered.length ? `${Math.round(100 * withCite.length / answered.length)}%` : "—",
     stale: String(staleN),
     cost: `$${spend.toFixed(5)}`,
     alone: `${Math.round(100 * alone / done.length)}%`,
+    seen: done.length,
+    drafted: alone,
+    toPerson: done.length - alone,
+    refused,
+    spend: `$${done.reduce((a, r) => a + (r.result!.usd || 0), 0).toFixed(4)}`,
   };
 }

@@ -162,3 +162,53 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .crow .primary { margin-left: auto; }
 .chint { margin: 0; font-size: 12px; color: var(--mut); line-height: 1.45; }
 .chint code { font-size: 11.5px; }
+
+/* ---- the pipeline, while it runs -------------------------------------
+   Stage rows and the provisional draft. Deliberately quieter than a real
+   reply: this is work in progress, and it must not read like an answer. */
+.live { margin: 14px 0 0; }
+.boxes { list-style: none; margin: 0; padding: 0;
+         display: flex; flex-wrap: wrap; gap: 6px; }
+.boxes li { display: flex; align-items: baseline; gap: 7px;
+            border: 1px solid var(--line); border-radius: 6px;
+            padding: 4px 9px; background: var(--card);
+            animation: boxin .18s ease-out; }
+@keyframes boxin { from { opacity: 0; transform: translateY(2px); }
+                   to { opacity: 1; transform: none; } }
+.boxes .bx { font-family: var(--mono); font-size: 12px; color: var(--fg); }
+.boxes .bn { font-size: 12px; color: var(--dim); }
+.boxes .bm { font-family: var(--mono); font-size: 11px; color: var(--dim);
+             opacity: .75; }
+.boxes li.pending .bx { color: var(--dim); }
+.livedraft { margin-top: 12px; border-left: 2px solid var(--line);
+             padding-left: 12px; }
+.lhead { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em;
+         text-transform: uppercase; color: var(--warn, #F2B134); }
+.ltext { margin: 0; color: var(--dim); line-height: 1.55; }
+.caret { display: inline-block; width: 7px; height: 1em; margin-left: 2px;
+         background: var(--accent); vertical-align: text-bottom;
+         animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---- the running tally ------------------------------------------------
+   Sticky at the foot, because during a live feed it is the thing you watch:
+   the counts move with every ticket and the rates settle as the sample
+   grows. Above the fold it would scroll away exactly when it matters. */
+.scorebar { position: sticky; bottom: 0; z-index: 5;
+            margin: 20px -20px 0; padding: 12px 20px 14px;
+            background: color-mix(in srgb, var(--bg) 92%, transparent);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid var(--line); }
+.tallies { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline;
+           margin-bottom: 10px; font-size: 13px; color: var(--dim); }
+.tallies b { font-family: var(--mono); font-size: 16px; color: var(--fg);
+             margin-right: 4px; }
+.tallies .ok b { color: var(--good, #3ECF8E); }
+.tallies .warn b { color: var(--warn, #F2B134); }
+.tallies .bad b { color: var(--accent); }
+.tallies .sp { margin-left: auto; font-family: var(--mono); font-size: 12px; }
+.scorebar .board { margin: 0; }
+@media (max-width: 760px) {
+  .scorebar { position: static; margin: 20px 0 0; padding: 12px 0 0; }
+  .tallies .sp { margin-left: 0; }
+}
