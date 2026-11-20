@@ -47,7 +47,25 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .split { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 36px; margin-top: 30px; }
 @media (max-width: 860px) { .split { grid-template-columns: 1fr; gap: 24px; } }
 
-.list { display: flex; flex-direction: column; gap: 1px; }
+/* The queue scrolls inside itself and stays put while the reply column
+   scrolls the page. A live feed makes this list unbounded: without it the
+   page grows by a row every couple of seconds, and reading a reply means
+   scrolling past a queue that is still getting longer. Sticky rather than a
+   fixed-height grid, so the main column keeps its natural page scroll and
+   the tally stays stuck to the foot. */
+.list { display: flex; flex-direction: column; gap: 1px;
+        position: sticky; top: 16px; align-self: start;
+        max-height: calc(100vh - 150px); overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin; scrollbar-color: var(--line2) transparent;
+        padding-right: 4px; }
+.list::-webkit-scrollbar { width: 6px; }
+.list::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
+.list::-webkit-scrollbar-track { background: transparent; }
+@media (max-width: 860px) {
+  /* One column: a sticky, inner-scrolling sidebar would trap the page. */
+  .list { position: static; max-height: 46vh; }
+}
 .item { display: flex; gap: 10px; align-items: flex-start; text-align: left;
   padding: 9px 10px; border-radius: 7px; }
 .item:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
