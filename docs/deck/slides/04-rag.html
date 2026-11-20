@@ -7,11 +7,11 @@ h1{color:#E6E9EF;font-size:25pt;margin:0 0 14pt 0;letter-spacing:-0.5pt;}
 .mono{font-family:'Courier New',monospace;}
 .lane{color:#8B95A7;font-size:8.5pt;margin:0 0 6pt 0;font-family:'Courier New',monospace;letter-spacing:1.2pt;}
 .flow{display:flex;align-items:center;gap:7pt;margin:0 0 15pt 0;}
-.bx{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:8pt 9pt;box-sizing:border-box;height:58pt;}
+.bx{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:7pt 8pt;box-sizing:border-box;height:62pt;}
 .bx.key{border:1.5pt solid #3ECF8E;background:#101A16;}
 .bx.mdl{border:1.5pt solid #E8336D;background:#1C1420;}
-.bn{color:#E6E9EF;font-size:9.5pt;font-weight:bold;margin:0 0 2pt 0;line-height:1.2;}
-.bd{color:#8B95A7;font-size:8pt;margin:0;font-family:'Courier New',monospace;line-height:1.3;}
+.bn{color:#E6E9EF;font-size:9pt;font-weight:bold;margin:0 0 2pt 0;line-height:1.2;}
+.bd{color:#8B95A7;font-size:7.3pt;margin:0;font-family:'Courier New',monospace;line-height:1.3;}
 .ar{color:#3A4454;font-size:13pt;margin:0;}
 .pair{display:flex;flex-direction:column;gap:4pt;}
 .bx.sm{height:27pt;padding:5pt 9pt;}
@@ -26,7 +26,7 @@ h1{color:#E6E9EF;font-size:25pt;margin:0 0 14pt 0;letter-spacing:-0.5pt;}
 <div class="flow">
   <div class="bx" style="width:148pt;"><p class="bn">4 policy documents</p><p class="bd">runbook, SLA, SOP,<br>escalation policy</p></div>
   <p class="ar">&rarr;</p>
-  <div class="bx key" style="width:160pt;"><p class="bn">Document-aware chunking</p><p class="bd">+ contextual header enrichment:<br>doc, heading trail, region, DATES</p></div>
+  <div class="bx key" style="width:160pt;"><p class="bn">Document-aware chunking</p><p class="bd">+ contextual header enrichment:<br>doc, heading trail,<br>region, DATES</p></div>
   <p class="ar">&rarr;</p>
   <div class="bx" style="width:140pt;"><p class="bn">Titan Embed v2</p><p class="bd">512 of 1024 dims &middot; no<br>measured loss, half the index</p></div>
   <p class="ar">&rarr;</p>
@@ -35,18 +35,20 @@ h1{color:#E6E9EF;font-size:25pt;margin:0 0 14pt 0;letter-spacing:-0.5pt;}
 
 <p class="lane">QUERY TIME &nbsp;&middot;&nbsp; PER TICKET, ~1.5s</p>
 <div class="flow">
-  <div class="bx" style="width:104pt;"><p class="bn">Masked ticket<br>+ as_of date</p><p class="bd">an input, not an<br>afterthought</p></div>
+  <div class="bx" style="width:90pt;"><p class="bn">Masked ticket</p><p class="bd">+ as_of date &mdash; an<br>input, not an<br>afterthought</p></div>
   <p class="ar">&rarr;</p>
-  <div class="bx key" style="width:132pt;"><p class="bn">Metadata pre-filter</p><p class="bd">predicate pushdown: region<br>+ rule in force, before ranking</p></div>
+  <div class="bx key" style="width:96pt;"><p class="bn">Language</p><p class="bd">the QUERY is<br>translated, never<br>the corpus</p></div>
   <p class="ar">&rarr;</p>
-  <div class="pair" style="width:118pt;">
+  <div class="bx key" style="width:112pt;"><p class="bn">Metadata pre-filter</p><p class="bd">region + rule in<br>force, before<br>ranking</p></div>
+  <p class="ar">&rarr;</p>
+  <div class="pair" style="width:108pt;">
     <div class="bx sm"><p class="bn">Dense ANN &middot; HNSW cosine</p></div>
     <div class="bx sm"><p class="bn">Sparse FTS &middot; ts_rank_cd</p></div>
   </div>
   <p class="ar">&rarr;</p>
-  <div class="bx" style="width:86pt;"><p class="bn">RRF fusion</p><p class="bd">rank-based, k=60<br>top 5</p></div>
+  <div class="bx" style="width:70pt;"><p class="bn">RRF fusion</p><p class="bd">rank-based<br>k=60, top 5</p></div>
   <p class="ar">&rarr;</p>
-  <div class="bx mdl" style="width:106pt;"><p class="bn">Nova Pro drafts</p><p class="bd">with citations,<br>or refuses</p></div>
+  <div class="bx mdl" style="width:104pt;"><p class="bn">Nova Pro drafts</p><p class="bd">cites or refuses;<br>bilingual when the<br>ticket is not</p></div>
 </div>
 
 <p class="foot"><b>No cross-encoder re-ranking.</b> Ordering is already MRR 0.95 / hit@5 0.97 &mdash; ~0.05 headroom &mdash; while faithfulness and corpus coverage are the binding limits. <span class="mono">ap-southeast-2</span> exposes no rerank model. RRF is <span class="mono">fusion</span>, not re-ranking: it merges two rankings, never scoring query and passage jointly.</p>

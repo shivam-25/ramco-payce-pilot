@@ -18,26 +18,27 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 .accent { color:#E8336D; }
 .row { display:flex; gap:12pt; }
 
-.flow{display:flex;gap:4pt;margin:14pt 0 0 0;width:646pt;}
-.box{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:8pt 5pt;width:62pt;}
-.box p{color:#E6E9EF;font-size:8pt;margin:0;font-family:"Courier New",monospace;}
+.flow{display:flex;gap:3.5pt;margin:14pt 0 0 0;width:646pt;}
+.box{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:8pt 4pt;width:57.4pt;}
+.box p{color:#E6E9EF;font-size:7.5pt;margin:0;font-family:"Courier New",monospace;}
 .box .t{color:#8B95A7;font-size:6.5pt;margin:3pt 0 0 0;}
 .gate{border-color:#E8336D;}
 .two{display:flex;gap:12pt;margin:15pt 0 0 0;}
 .two .card{width:304pt;}
 </style></head><body><div class="slide">
 <p class="kicker">THE PIPELINE</p>
-<h1>Nine boxes. Each one can refuse.</h1>
+<h1>Ten boxes. Each one can refuse.</h1>
 <div class="flow">
 <div class="box gate"><p>PII gate</p><p class="t">G1 · 0 leaks</p></div>
 <div class="box"><p>normalise</p><p class="t">3 schemas</p></div>
 <div class="box"><p>lookup</p><p class="t">tier · region</p></div>
+<div class="box"><p>language</p><p class="t">5.5% not English</p></div>
 <div class="box gate"><p>injection</p><p class="t">G4 · 17/17</p></div>
 <div class="box gate"><p>classify</p><p class="t">G2 · routing</p></div>
 <div class="box gate"><p>dedupe</p><p class="t">G3 · clusters</p></div>
 <div class="box"><p>router</p><p class="t">money → human</p></div>
 <div class="box gate"><p>cache</p><p class="t">G8 · dated</p></div>
-<div class="box gate"><p>answer</p><p class="t">G5 · Ragas</p></div>
+<div class="box gate"><p>answer</p><p class="t">G5 · C1–C10</p></div>
 </div>
 <div class="two">
 <div class="card"><p class="body" style="margin:0 0 5pt 0;font-weight:bold;">Rules in code, judgement in the model.</p>

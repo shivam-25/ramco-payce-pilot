@@ -1,0 +1,71 @@
+<!DOCTYPE html><html><head><style>
+html{background:#0B0E14;}
+body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
+.slide{margin:0;padding:32pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:9.5pt;margin:0 0 7pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:25pt;margin:0 0 5pt 0;letter-spacing:-0.6pt;line-height:1.1;}
+.sub{color:#8B95A7;font-size:10pt;margin:0 0 13pt 0;line-height:1.4;width:600pt;}
+.grid{display:flex;gap:9pt;}
+.c{width:153pt;background:#141922;border:1px solid #242C3A;border-left:3px solid #E8336D;border-radius:6pt;padding:9pt 11pt;}
+.ct{color:#E6E9EF;font-size:10.5pt;font-weight:bold;margin:0 0 4pt 0;line-height:1.2;}
+.cb{color:#8B95A7;font-size:8.3pt;margin:0;line-height:1.38;}
+.cb b{color:#C6CCD8;font-weight:normal;}
+.mono{font-family:'Courier New',monospace;color:#3ECF8E;}
+.foot{color:#8B95A7;font-size:9pt;margin:11pt 0 0 0;line-height:1.4;width:640pt;}
+.foot b{color:#E6E9EF;font-weight:normal;}
+</style></head><body><div class="slide">
+<p class="kicker">DECISIONS, AND WHAT FORCED THEM</p>
+<h1>Four changes. None came from a failing test.</h1>
+<p class="sub">They came from typing a ticket into the console and reading what came back.</p>
+
+<div class="grid">
+  <div class="c">
+    <p class="ct">Translate the question, not the corpus</p>
+    <p class="cb"><b>5.5% of tickets are not English.</b> Each became a person&rsquo;s problem via a plausible escalation. Script detection is a rule; the query is translated on the cheap model. Translating the corpus would triple the index.</p>
+  </div>
+  <div class="c">
+    <p class="ct">Non-English drafts come back bilingual</p>
+    <p class="cb">An approval requirement, not a courtesy. <b>A person signs off every draft</b> &mdash; and an agent who cannot read Arabic approving Arabic is not approval.</p>
+  </div>
+  <div class="c">
+    <p class="ct">C10: a capability claim needs a passage</p>
+    <p class="cb">The prompt forbade it, naming the exact sentence. The model wrote it anyway and <b>passed every check</b>. A rule the model is asked to follow is a hope; the same rule in code is a gate.</p>
+  </div>
+  <div class="c">
+    <p class="ct">Cached answers carry the checks they passed</p>
+    <p class="cb">The draft that prompted C10 <b>was already cached</b>, and cache hits skip the checks. Entries below the current version are redrafted once and re-stored.</p>
+  </div>
+</div>
+
+<p class="foot"><b>The pattern is the point.</b> Gates caught the first six defects. These four were caught by using the thing &mdash; which is why the demo is a console and not a slide.</p>
+</div></body></html>
+<!--NOTES
+Appendix. Pull up when asked what changed after the write-up, or what the
+measurement did not catch.
+
+The honest framing: the gates found six defects, and four of those came
+from a test that had just passed. These four are different -- they came
+from operating the system, and no gate would have found them, because a
+gate only measures what you already thought to measure.
+
+Language: nothing in the pipeline was language-aware except one sentence in
+the classify prompt. An Arabic question embedded against an English corpus
+retrieves something plausible but wrong, and the drafter then correctly says
+the passages do not answer it. It failed safe and it failed silently, which
+is the combination that hides a 5.5% hole.
+
+Bilingual: if asked why not just reply in Arabic -- because a human approves
+every draft, and the approver may not read Arabic. The English half is the
+approval artifact.
+
+C10: this is the seventh defect from the previous slide, the one no gate
+caught. It is now a gate. Worth saying out loud that the prompt ALREADY had
+the rule, in the exact words, with the exact example sentence -- and the
+model wrote that sentence anyway. That is the argument for checks in code
+rather than instructions in prompts, made by the system against itself.
+
+Cache versioning: the sharp bit is that adding C10 did not fix the bug,
+because the bad answer was already cached and cache hits skip the checks.
+If asked why not purge: purging throws away every good entry too, and the
+version predicate heals the same way the sources column already does.
+-->
