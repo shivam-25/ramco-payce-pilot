@@ -304,6 +304,13 @@ def _portal(req: dict) -> dict:
                          offset=int(req.get("offset") or 0))
         out["organisation"] = pt.organisation(cid, region)
         return out
+    if op == "knowledge":
+        return pt.knowledge(region)
+    if op == "ticket":
+        tid = (req.get("ticket_id") or "").strip()
+        if not tid:
+            return {"error": "ticket_id is required"}
+        return pt.ticket(cid, region, tid)
     if op == "resolve":
         tid = (req.get("ticket_id") or "").strip()
         if not tid:

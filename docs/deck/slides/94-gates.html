@@ -37,9 +37,9 @@ h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
 <div class="rw"><p class="c1">G5</p><p class="c2">date-dependent answers</p><p class="c3">5/5</p><p class="c4">5/5</p><p class="c5 ok">PASS</p></div>
 <div class="rw"><p class="c1">G6</p><p class="c2">output check catches bad drafts</p><p class="c3">6/6 planted</p><p class="c4">6/6 · 4 real drafts withheld with reasons</p><p class="c5 ok">PASS</p></div>
 <div class="rw"><p class="c1">G7</p><p class="c2">cost per draft</p><p class="c3">USD 0.02</p><p class="c4">USD 0.00050</p><p class="c5 ok">PASS</p></div>
-<div class="rw"><p class="c1">G7</p><p class="c2">first reply, p95</p><p class="c3">3 s</p><p class="c4">2.51 s &mdash; was 6.17 s &middot; vendor 19 s</p><p class="c5 ok">PASS</p></div>
+<div class="rw"><p class="c1">G7</p><p class="c2">first reply, p95</p><p class="c3">3 s</p><p class="c4">1.45 s in-pipeline &middot; 3.27 s end to end</p><p class="c5 ok">PASS</p></div>
 <div class="rw"><p class="c1">G8</p><p class="c2">cache may not cross a policy change</p><p class="c3">0 stale</p><p class="c4">0 wrong-period · 4/4 reused in window</p><p class="c5 ok">PASS</p></div>
 </div>
 <p class="body" style="margin-top:9pt;width:645pt;">Routing beats the intake dropdown (86.0% &rarr; 90.0%) and fixes 50 of 56 misroutes a human had to undo, but the interval tops out at 92.5%.</p>
-<p class="body" style="width:645pt;">Latency passed once split. Three quarters of the wait was platform: the proxy asked AgentCore for a new session each request, so none met a warm one. Reusing them alone moved the clock <span class="mono">0.01 s</span> &mdash; a warm microVM inherits the last request&rsquo;s rate-limiter slot, so the pipeline lost what the platform saved. Together: <span class="mono">6.17 &rarr; 2.51 s</span>.</p>
+<p class="body" style="width:645pt;">Re-measured on the deployed path with the guardrail live (n=20): <b>stage times p95 1.45 s</b>, which is what G7 measures. <b>End to end from a client outside <span class="mono">ap-southeast-2</span> is 3.27 s at p95</b> &mdash; median 2.15 s, 6.48 s on a cold start. That gap is network and cold start, not the pipeline, and it is what a person actually waits.</p>
 </div></body></html>

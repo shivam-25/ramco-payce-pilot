@@ -1,40 +1,65 @@
-<!DOCTYPE html><html><head><style>html { background:#0B0E14; }
-body { width:720pt; height:405pt; margin:0; padding:0; background:#0B0E14;
-       font-family:Arial, Helvetica, sans-serif; display:flex; }
-.slide { margin:0; padding:34pt 40pt; width:720pt; height:405pt; box-sizing:border-box; }
-h1 { color:#E6E9EF; font-size:30pt; margin:0 0 6pt 0; letter-spacing:-0.4pt; }
-h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
-.kicker { color:#E8336D; font-size:10pt; margin:0 0 9pt 0; font-weight:bold;
-          letter-spacing:1.6pt; font-family:'Courier New', monospace; }
-.sub { color:#8B95A7; font-size:11.5pt; margin:0 0 14pt 0; line-height:1.4; }
-.body { color:#C6CCD8; font-size:11.5pt; margin:0 0 7pt 0; line-height:1.45; }
-.small { color:#8B95A7; font-size:9.5pt; margin:0; line-height:1.35; }
-.mono { font-family:'Courier New', monospace; }
-.card { background:#141922; border:1px solid #242C3A; border-radius:7pt; padding:13pt; }
-.num { color:#E8336D; font-size:30pt; margin:0; font-family:'Courier New', monospace; font-weight:bold; }
-.numlabel { color:#8B95A7; font-size:9pt; margin:3pt 0 0 0; line-height:1.3; }
-.ok { color:#3ECF8E; }
-.warn { color:#F2B134; }
-.accent { color:#E8336D; }
-.row { display:flex; gap:12pt; }
-
-.f{background:#141922;border:1px solid #242C3A;border-left:3pt solid #E8336D;border-radius:4pt;padding:9pt 11pt;margin:0 0 6pt 0;}
-.f p{margin:0;}
-.f .t{color:#E6E9EF;font-size:10pt;font-weight:bold;}
-.f .d{color:#8B95A7;font-size:8.5pt;margin-top:2pt;line-height:1.35;}
-.two{display:flex;gap:11pt;margin-top:11pt;}
-.two>div{width:314pt;}
+<!DOCTYPE html><html><head><style>
+html{background:#0B0E14;}
+body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
+.slide{margin:0;padding:34pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:9.5pt;margin:0 0 7pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:30pt;margin:0 0 6pt 0;letter-spacing:-0.8pt;line-height:1.12;}
+h1 .g{color:#3ECF8E;}
+.sub{color:#8B95A7;font-size:11pt;margin:0 0 24pt 0;line-height:1.45;width:620pt;}
+.three{display:flex;gap:16pt;margin:0 0 22pt 0;}
+.c{width:196pt;}
+.ct{color:#E6E9EF;font-size:11pt;font-weight:bold;margin:0 0 5pt 0;line-height:1.25;}
+.cb{color:#8B95A7;font-size:9.5pt;margin:0;line-height:1.5;}
+.rule{border-top:2px solid #E8336D;width:34pt;margin:0 0 7pt 0;}
+.foot{color:#C6CCD8;font-size:10.5pt;margin:0;line-height:1.5;width:640pt;}
+.foot b{color:#E6E9EF;font-weight:normal;}
 </style></head><body><div class="slide">
 <p class="kicker">WHAT MEASUREMENT FOUND THAT REVIEW DID NOT</p>
-<h1>Six defects. All of them mine.</h1>
-<div class="two"><div>
-<div class="f"><p class="t">The abstain threshold compared two different scales</p><p class="d">Rank-fusion scores sit near 0.016; the floor was a 0.55 cosine similarity. Everything looked irrelevant, so everything escalated.</p></div>
-<div class="f"><p class="t">Similarity cannot tell answerable from unanswerable</p><p class="d">Measured: answerable 0.20&ndash;0.65, unanswerable 0.28&ndash;0.50. The distributions overlap almost entirely, so no threshold works. Abstention moved to the model, verified in code.</p></div>
-<div class="f"><p class="t">The prior-period chunk named its own replacement</p><p class="d">A chunk describing June also said &ldquo;replaced by 25,000&rdquo;. The model read the new value off it and quoted it.</p></div>
-</div><div>
-<div class="f"><p class="t">The cache ignored time</p><p class="d">September matched June at 0.958 and was served June&rsquo;s answer &mdash; the original incident, reintroduced by an optimisation. Entries now carry a validity window. Gate G8.</p></div>
-<div class="f"><p class="t">A cited pointer passed as an answer</p><p class="d">&ldquo;The rate is in KB-0140, see Confluence.&rdquo; Also why Ragas scored faithfulness 0.756: a claim about where an answer lives is still an unsupported claim.</p></div>
-<div class="f"><p class="t">The PII gate understated its own work</p><p class="d">Notes buried in event histories were masked correctly and then reported as &ldquo;no personal data found&rdquo;. The quiet direction of error.</p></div>
-</div></div>
-<p class="small" style="margin-top:10pt;">Four of the six were found by a test the code had just passed &mdash; the argument for gates with numbers rather than a review with opinions. A seventh is on the next slide, and no gate caught it: the pilot invented product behaviour, and I only found it by typing a ticket into the console. Gates catch what you thought to measure. Using the thing catches the rest.</p>
+<h1>Six defects. <span class="g">Four were found by tests that had just passed.</span></h1>
+<p class="sub">Not by reading the code, and not by reviewing the design. By a number moving in a direction nobody expected.</p>
+
+<div class="three">
+  <div class="c">
+    <div class="rule"></div>
+    <p class="ct">The cache ignored time</p>
+    <p class="cb">September was served June&rsquo;s answer &mdash; the founding incident, reintroduced by my own optimisation. Entries now carry a validity window.</p>
+  </div>
+  <div class="c">
+    <div class="rule"></div>
+    <p class="ct">The gate understated its own work</p>
+    <p class="cb">Identifiers buried in event histories were masked correctly, then reported as &ldquo;none found&rdquo;. Right answer, wrong accounting.</p>
+  </div>
+  <div class="c">
+    <div class="rule"></div>
+    <p class="ct">A pointer passed as an answer</p>
+    <p class="cb">&ldquo;The rate is in KB-0140, see Confluence.&rdquo; Telling a customer where an answer lives is not answering them.</p>
+  </div>
+</div>
+
+<p class="foot"><b>That is the argument for gates with numbers rather than a review with opinions.</b> The other two were a threshold comparing two different scales and a chunk that named its own replacement. A seventh escaped every gate &mdash; the pilot invented product behaviour, and I found it by typing a ticket into the console. <b>Gates catch what you thought to measure. Using the thing catches the rest.</b></p>
 </div></body></html>
+<!--NOTES
+Appendix. Pull up when asked how the defects were found, or to make the case
+for measurement over review.
+
+The headline is the whole slide: four of six were found by a test that had
+just PASSED. Not by reading code, not by design review -- by a number moving
+in a direction nobody predicted.
+
+The three shown are the ones a listener can hold without the codebase in
+their head. The cache one is the sharpest: a semantic cache that matched on
+meaning and ignored time served a September question June's answer, which is
+the exact incident this pilot exists to prevent, reintroduced by my own
+optimisation. Gate G8 now guards it.
+
+The two not shown, if asked: the abstain threshold compared rank-fusion
+scores near 0.016 against a 0.55 cosine floor -- two different scales, so
+everything looked irrelevant and everything escalated. And a chunk
+describing the June period also said "replaced by 25,000", so the model read
+the new value off the old chunk and quoted it.
+
+End on the seventh, which no gate caught: the pilot stated that the payroll
+system does not support exporting payslips as a zip, cited to a runbook that
+says nothing of the kind. Found by using the console, not by a test. That is
+why coverage is 25% and not the 51.7% an earlier metric suggested.
+-->

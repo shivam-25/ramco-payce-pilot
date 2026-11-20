@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Detail from "./Detail";
+import Knowledge from "./Knowledge";
 
 type Ticket = {
   ticket_id: string; subject: string; category: string; priority: string;
@@ -34,6 +36,8 @@ export default function Portal() {
   const [working, setWorking] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [booted, setBooted] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [section, setSection] = useState<"tickets" | "kb">("tickets");
 
   const load = useCallback(async (state: string) => {
     setBusy(true); setErr("");
@@ -76,6 +80,12 @@ export default function Portal() {
 
   if (!booted) return <main className="pwrap"><p className="pmuted">Loading…</p></main>;
   if (!session) return <SignIn onIn={(s) => { setSession(s); load("open"); }} />;
+  if (openId) return (
+    <main className="pwrap">
+      <Detail id={openId} onBack={() => { setOpenId(null); load(tab); }}
+              onChanged={() => load(tab)} />
+    </main>
+  );
 
   return (
     <main className="pwrap">
@@ -104,6 +114,14 @@ export default function Portal() {
         </div>
       </header>
 
+      <nav className="psec">
+        <button className={`psecb ${section === "tickets" ? "on" : ""}`}
+          onClick={() => { setSection("tickets"); setOpenId(null); }}>Tickets</button>
+        <button className={`psecb ${section === "kb" ? "on" : ""}`}
+          onClick={() => { setSection("kb"); setOpenId(null); }}>Knowledge base</button>
+      </nav>
+
+      {section === "kb" ? <Knowledge /> : <>
       <h1 className="ph1">Your support tickets</h1>
       <p className="pmuted">
         Select a ticket to see what happened at each stage. Resolving one
@@ -134,7 +152,7 @@ export default function Portal() {
           {rows.map((t) => (
             <li key={t.ticket_id} className="prow">
               <div className="pmain">
-                <p className="psub">{t.subject}</p>
+                <button className="psub aslink" onClick={() => setOpenId(t.ticket_id)}>{t.subject}</button>
                 <p className="pmeta">
                   <span className="pid">{t.ticket_id}</span>
                   <span className={`ppri ${t.priority}`}>{t.priority}</span>
@@ -161,6 +179,7 @@ export default function Portal() {
           ))}
         </ul>
       )}
+      </>}
     </main>
   );
 }

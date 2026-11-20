@@ -112,3 +112,91 @@ def resolve(customer_id: str, region: str, ticket_id: str,
         return {"changed": False,
                 "reason": "no ticket with that id belongs to this organisation"}
     return {"changed": True, "ticket": _shape(dict(row))}
+
+
+_FULL = (_COLS + ", body_masked, channel, region, tier, raw_category, "
+         "queue_intake, pii_counts")
+
+
+def ticket(customer_id: str, region: str, ticket_id: str) -> dict:
+    """One ticket in full, for the detail view.
+
+    Scoped by organisation like everything else here, and serving only the
+    masked columns. `pii_counts` is carried deliberately: the detail view
+    says how many identifiers the gate removed from this particular ticket,
+    which is a stronger statement than a policy page claiming it masks.
+    """
+    with connect(region) as conn:
+        row = conn.execute(
+            f"SELECT {_FULL} FROM tickets "
+            " WHERE ticket_id = %s AND customer_id = %s",
+            (ticket_id, customer_id)).fetchone()
+    if not row:
+        return {"error": "no ticket with that id belongs to this organisation"}
+    r = dict(row)
+    out = _shape(r)
+    counts = r.get("pii_counts")
+    if isinstance(counts, str):
+        import json as _j
+        try: counts = _j.loads(counts)
+        except ValueError: counts = {}
+    out.update({
+        "body": r.get("body_masked") or "",
+        "channel": r.get("channel") or "",
+        "region": r.get("region") or region,
+        "tier": r.get("tier") or "",
+        "raw_category": r.get("raw_category") or "",
+        "queue_intake": r.get("queue_intake") or "",
+        "pii_counts": counts or {},
+        # Stated rather than left blank: the export carries no satisfaction
+        # field, so there is nothing to show and inventing one would be the
+        # single thing this pilot refuses to do.
+        "csat": None,
+    })
+    return {"ticket": out}
+
+
+def knowledge(region: str, strategy: str = "D_heading_context") -> dict:
+    """What the pilot is allowed to answer from, counted rather than claimed.
+
+    The honest part of this view is the empty rows. Twenty-four knowledge-base
+    articles exist as index entries whose bodies point at Confluence, so they
+    carry no text to retrieve. Showing them with a chunk count of zero is the
+    difference between "coverage is 25%" as an excuse and as a measurement:
+    the ceiling is in the corpus, and the corpus is on screen.
+    """
+    # "Usable" is the same test retrieval itself applies: a chunk whose text
+    # carries the stub marker is an index entry pointing at Confluence, not an
+    # answer, and the retriever excludes it. Counting it the same way here
+    # means this page cannot drift from what the pipeline will actually find.
+    from .chunking import STUB_MARKER
+    stub_like = f"%{STUB_MARKER}%"
+    with connect(region) as conn:
+        rows = conn.execute(
+            "SELECT source_type, source_id, count(*) AS chunks, "
+            "       min(effective_from) AS from_date, max(effective_to) AS to_date, "
+            "       count(*) FILTER (WHERE text NOT LIKE %s) AS usable "
+            "  FROM doc_chunks WHERE strategy = %s "
+            " GROUP BY source_type, source_id "
+            " ORDER BY source_type, source_id", (stub_like, strategy)).fetchall()
+        stubs = conn.execute(
+            "SELECT count(DISTINCT source_id) AS n FROM doc_chunks "
+            " WHERE strategy = %s AND source_type = 'kb' AND text LIKE %s",
+            (strategy, stub_like)).fetchone()
+        rules = conn.execute(
+            "SELECT rule_id, name, new_value, effective_from "
+            "  FROM statutory_rules ORDER BY effective_from").fetchall()
+
+    docs = [{"type": r["source_type"], "id": r["source_id"],
+             "chunks": int(r["chunks"]), "usable": int(r["usable"] or 0),
+             "from": str(r["from_date"] or ""), "to": str(r["to_date"] or "")}
+            for r in rows]
+    return {
+        "documents": docs,
+        "indexed_chunks": sum(d["chunks"] for d in docs),
+        "empty_kb_articles": int(stubs["n"]) if stubs else 0,
+        "rules": [{"id": r["rule_id"], "name": r["name"],
+                   "value": str(r["new_value"]),
+                   "from": str(r["effective_from"])} for r in rules],
+        "strategy": strategy,
+    }

@@ -122,14 +122,16 @@ def handler(event, _context):
     port = payload.get("portal")
     if isinstance(port, dict):
         op = str(port.get("op") or "tickets")
-        if op not in {"tickets", "resolve"}:
+        if op not in {"tickets", "resolve", "ticket", "knowledge"}:
             return _reply(400, {"error": "unknown portal op"})
         cid = str(port.get("customer_id") or "")[:40]
         region = str(port.get("region") or "").upper()[:8]
         if not cid or region not in {"IN", "UAE"}:
             return _reply(400, {"error": "portal needs customer_id and region"})
         sub = {"op": op, "customer_id": cid, "region": region}
-        if op == "tickets":
+        if op == "knowledge":
+            pass
+        elif op == "tickets":
             state = str(port.get("state") or "all")
             sub["state"] = state if state in {"open", "resolved", "all"} else "all"
             try:
@@ -140,9 +142,10 @@ def handler(event, _context):
         else:
             tid = str(port.get("ticket_id") or "")[:64]
             if not tid:
-                return _reply(400, {"error": "resolve needs a ticket_id"})
+                return _reply(400, {"error": f"{op} needs a ticket_id"})
             sub["ticket_id"] = tid
-            sub["resolved"] = bool(port.get("resolved", True))
+            if op == "resolve":
+                sub["resolved"] = bool(port.get("resolved", True))
         clean["portal"] = sub
 
     try:
