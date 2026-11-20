@@ -23,6 +23,25 @@ async function callRuntime(portal: Record<string, unknown>) {
   return text;
 }
 
+/** Run the pipeline over one of this organisation's tickets. Same invariant
+ *  as every other action here: the organisation comes from the cookie, so the
+ *  run is scoped to the right regional database and the right customer
+ *  record without the browser having a say in either. */
+async function callTriage(body: Record<string, unknown>) {
+  const url = process.env.PILOT_API_URL;
+  const key = process.env.PILOT_API_KEY;
+  if (!url || !key) throw new Error("pilot endpoint is not configured");
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-pilot-key": key },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(55_000),
+  });
+  const text = await r.text();
+  if (!r.ok) throw new Error(`pilot returned ${r.status}: ${text.slice(0, 200)}`);
+  return text;
+}
+
 export async function POST(req: NextRequest) {
   const sent = await req.json().catch(() => ({}));
   const action = String(sent.action ?? "");
@@ -63,6 +82,18 @@ export async function POST(req: NextRequest) {
     // so asking for another organisation's id returns nothing rather than
     // someone else's row -- the scoping is a predicate on the query, not a
     // filter this route could be talked out of.
+    if (action === "run") {
+      const text = await callTriage({
+        subject: String(sent.subject ?? "").slice(0, 400),
+        body: String(sent.body ?? "").slice(0, 8000),
+        customer_id: s.customer_id,
+        as_of: sent.as_of ? String(sent.as_of).slice(0, 10) : null,
+        use_cache: true,
+      });
+      return new NextResponse(text, { status: 200,
+        headers: { "content-type": "application/json" } });
+    }
+
     if (action === "ticket") {
       const text = await callRuntime({
         op: "ticket", customer_id: s.customer_id, region: s.region,

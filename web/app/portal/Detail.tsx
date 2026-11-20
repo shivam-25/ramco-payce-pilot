@@ -73,11 +73,14 @@ export default function Detail({ id, onBack, onChanged }:
     if (!t) return;
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/triage", { method: "POST",
+      // Through the portal route, not /api/triage, so the organisation comes
+      // from the signed cookie. Sending customer_id from here would be the one
+      // place the browser got to choose whose data a run reads.
+      const r = await fetch("/api/portal", { method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ subject: t.subject, body: t.body,
-          customer_id: "", as_of: (t.received_at || "").slice(0, 10) || null,
-          use_cache: false }) });
+        body: JSON.stringify({ action: "run", subject: t.subject,
+          body: t.body,
+          as_of: (t.received_at || "").slice(0, 10) || null }) });
       const d = await r.json();
       if (d.error) setErr(d.error); else setRun(d);
     } catch { setErr("Could not reach the pipeline."); }
