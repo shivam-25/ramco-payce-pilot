@@ -354,3 +354,16 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
            line-height: 1.6; white-space: pre-wrap; color: var(--ink); }
 .red { background: rgba(232, 51, 109, 0.16); color: var(--accent);
        border-radius: 3px; padding: 1px 4px; font-weight: 600; }
+
+/* Per-stage timings on every ticket, not only the streamed ones. The row is
+   the argument in one line: the sub-millisecond boxes are code, and only the
+   outlined ones cost money. */
+.stagerow { list-style: none; display: flex; flex-wrap: wrap; gap: 5px;
+            margin: 0 0 6px; padding: 0; }
+.stagerow li { border: 1px solid var(--line); border-radius: 5px;
+               padding: 3px 7px; display: flex; gap: 7px; align-items: baseline;
+               background: var(--panel); }
+.stagerow li.mdl { border-color: var(--accent); }
+.stagerow .sn { font-size: 11px; color: var(--ink); }
+.stagerow .sv { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.stagenote { margin: 0; font-size: 11px; color: var(--dim); }

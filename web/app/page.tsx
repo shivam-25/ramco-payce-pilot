@@ -642,11 +642,42 @@ function Compare({ row }: { row: Row }) {
   );
 }
 
+/** Which stages run a model. The point of showing the row at all is that
+ *  only these two cost anything; everything else is code, and says so by
+ *  being under a millisecond. */
+const MODEL_STAGES = new Set(["classify", "draft", "answer", "judge"]);
+
+const STAGE_LABEL: Record<string, string> = {
+  pii: "PII gate", guardrail_pii: "managed PII screen", normalise: "normalise",
+  lookup: "lookup", injection: "injection screen",
+  guardrail_injection: "managed injection screen", classify: "classify",
+  dedupe: "dedupe", route: "router", router: "router", retrieve: "retrieve",
+  draft: "draft", answer: "draft", judge: "judge", output_check: "output check",
+  cache: "cache",
+};
+
 function Details({ r }: { r: Result }) {
   const ms = Object.entries(r.timings_ms || {});
   const total = ms.reduce((a, [, v]) => a + v, 0);
   return (
     <dl className="details">
+      {ms.length > 0 && (
+        <><dt>Stages</dt>
+        <dd>
+          <ol className="stagerow">
+            {ms.map(([k, v]) => (
+              <li key={k} className={MODEL_STAGES.has(k) ? "mdl" : ""}>
+                <span className="sn">{STAGE_LABEL[k] || k}</span>
+                <span className="sv">{v < 1 ? "<1" : Math.round(v)} ms</span>
+              </li>
+            ))}
+          </ol>
+          <p className="stagenote">
+            Measured, not decorative. Outlined = a model runs; everything else
+            is code.
+          </p>
+        </dd></>
+      )}
       <dt>Goes to</dt><dd>{r.queue || "a person"}</dd>
       <dt>Why</dt><dd>{r.reason}</dd>
       {r.case_id && <><dt>Grouped as</dt>
