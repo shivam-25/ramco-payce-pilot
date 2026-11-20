@@ -55,6 +55,9 @@ aws iam put-role-policy --role-name "$ROLE" --policy-name pilot-runtime --policy
        \"arn:aws:bedrock:$REGION::foundation-model/*\",
        \"arn:aws:bedrock:*::foundation-model/*\",
        \"arn:aws:bedrock:$REGION:$ACCOUNT:inference-profile/*\"]},
+    {\"Sid\":\"GuardrailScreening\",\"Effect\":\"Allow\",
+     \"Action\":[\"bedrock:ApplyGuardrail\"],
+     \"Resource\":[\"arn:aws:bedrock:$REGION:$ACCOUNT:guardrail/*\"]},
     {\"Sid\":\"DbCredentialsOnly\",\"Effect\":\"Allow\",
      \"Action\":\"secretsmanager:GetSecretValue\",
      \"Resource\":[\"$(out SecretArnIN)\",\"$(out SecretArnUAE)\"]},
@@ -106,10 +109,17 @@ GR_ID=$(aws bedrock list-guardrails --region "$REGION" \
           --output text 2>/dev/null || echo "")
 [ "$GR_ID" = "None" ] && GR_ID=""
 if [ -n "$GR_ID" ]; then
+  # Pin the highest PUBLISHED version. list-guardrails returns DRAFT too,
+  # and DRAFT would silently pick up unpublished edits in production.
   GR_VER=$(aws bedrock list-guardrails --region "$REGION" \
-            --query "guardrails[?name=='ramco-payce-pilot']|[0].version" \
-            --output text)
-  [ "$GR_VER" = "None" ] || [ -z "$GR_VER" ] && GR_VER=1
+            --guardrail-identifier "$GR_ID" \
+            --query "guardrails[?version!='DRAFT'].version" --output text \
+           | tr '\t' '\n' | sort -n | tail -1)
+  if [ -z "$GR_VER" ]; then
+    echo "ERROR: guardrail $GR_ID has no published version."
+    echo "       run ./scripts/setup_guardrail.sh to publish one."
+    exit 1
+  fi
 else
   GR_VER=""
   echo "WARNING: no guardrail found -- deploying with regex screens only."
