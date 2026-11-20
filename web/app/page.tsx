@@ -26,6 +26,7 @@ export default function Console() {
   const [sel, setSel] = useState(TICKETS[0].id);
   const [busy, setBusy] = useState(false);
   const [acted, setActed] = useState<Record<string, string>>({});
+  const [writing, setWriting] = useState(false);
 
   const patch = (key: string, p: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)));
@@ -59,6 +60,27 @@ export default function Console() {
     setSel(extra[extra.length - 1]?.key ?? sel);
   }
 
+  // A ticket typed here goes through exactly the same path as the seeded
+  // ones: same endpoint, same gate, same checks. Nothing about it is special
+  // cased, which is the point of being able to type one during a demo.
+  async function addTicket(t: { subject: string; body: string;
+                                customer: string; asOf: string }) {
+    const key = `W-${Date.now().toString(36)}`;
+    const row: Row = { key, subject: t.subject.trim() || "Untitled ticket",
+                       body: t.body.trim(), customer: t.customer.trim() || "C-1001",
+                       asOf: t.asOf, note: "Typed into the console just now.",
+                       state: "running" };
+    setRows((rs) => [...rs, row]);
+    setSel(key);
+    setWriting(false);
+    try {
+      const result = await triage(row, false);
+      patch(key, { state: result.error ? "failed" : "done", result });
+    } catch (e) {
+      patch(key, { state: "failed", result: { error: String(e) } as Result });
+    }
+  }
+
   async function comparePeriod(key: string, asOf: string) {
     const row = rows.find((r) => r.key === key);
     if (!row) return;
@@ -86,12 +108,17 @@ export default function Console() {
              the rule was in force. Nothing is sent, and nothing is paid.</p>
         </div>
         <div className="actions">
+          <button className="ghost" onClick={() => setWriting((w) => !w)} disabled={busy}>
+            {writing ? "Cancel" : "Write a ticket"}
+          </button>
           <button className="ghost" onClick={addRepeats} disabled={busy}>Add repeat reports</button>
           <button className="primary" onClick={runAll} disabled={busy}>
             {busy ? "Working…" : "Draft all replies"}
           </button>
         </div>
       </header>
+
+      {writing && <Composer onSubmit={addTicket} />}
 
       {incident && (
         <p className="incident">
@@ -176,6 +203,50 @@ export default function Console() {
         </section>
       </div>
     </main>
+  );
+}
+
+// Type a ticket and send it down the same pipeline as the seeded ones.
+// Customer and date are editable because both change the answer: an unknown
+// customer is a hand-off, and the date decides which rule is in force.
+function Composer({ onSubmit }: {
+  onSubmit: (t: { subject: string; body: string;
+                  customer: string; asOf: string }) => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [customer, setCustomer] = useState("C-1001");
+  const [asOf, setAsOf] = useState("2026-09-15");
+
+  return (
+    <form className="composer"
+          onSubmit={(e) => { e.preventDefault();
+                             if (body.trim()) onSubmit({ subject, body, customer, asOf }); }}>
+      <p className="cmark">Write a ticket</p>
+      <input className="cin" placeholder="Subject" value={subject}
+             onChange={(e) => setSubject(e.target.value)} />
+      <textarea className="cin cbody" rows={3} autoFocus
+                placeholder="What is the customer asking? Paste anything — the PII gate and the injection screen run before any model sees it."
+                value={body} onChange={(e) => setBody(e.target.value)} />
+      <div className="crow">
+        <label>Customer
+          <input className="cin csm" value={customer}
+                 onChange={(e) => setCustomer(e.target.value)} />
+        </label>
+        <label>Payroll period
+          <input className="cin csm" type="date" value={asOf}
+                 onChange={(e) => setAsOf(e.target.value)} />
+        </label>
+        <button className="primary" type="submit" disabled={!body.trim()}>
+          Draft a reply
+        </button>
+      </div>
+      <p className="chint">
+        Known customers include <code>C-1001</code> (India) and <code>C-1003</code> (UAE).
+        An id that is not on file is handed to a person, because no regional
+        database can be chosen for it.
+      </p>
+    </form>
   );
 }
 
