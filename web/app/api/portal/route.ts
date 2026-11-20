@@ -59,6 +59,27 @@ export async function POST(req: NextRequest) {
         headers: { "content-type": "application/json" } });
     }
 
+    // One masked ticket. The customer_id still comes from the sealed cookie,
+    // so asking for another organisation's id returns nothing rather than
+    // someone else's row -- the scoping is a predicate on the query, not a
+    // filter this route could be talked out of.
+    if (action === "ticket") {
+      const text = await callRuntime({
+        op: "ticket", customer_id: s.customer_id, region: s.region,
+        ticket_id: String(sent.ticket_id ?? "").slice(0, 64),
+      });
+      return new NextResponse(text, { status: 200,
+        headers: { "content-type": "application/json" } });
+    }
+
+    if (action === "knowledge") {
+      const text = await callRuntime({
+        op: "knowledge", customer_id: s.customer_id, region: s.region,
+      });
+      return new NextResponse(text, { status: 200,
+        headers: { "content-type": "application/json" } });
+    }
+
     const state = ["open", "resolved", "all"].includes(String(sent.state))
       ? String(sent.state) : "all";
     const text = await callRuntime({

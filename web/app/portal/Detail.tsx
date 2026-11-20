@@ -59,7 +59,13 @@ export default function Detail({ id, onBack, onChanged }:
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "ticket", ticket_id: id }) })
       .then((r) => r.json())
-      .then((d) => d.error ? setErr(d.error) : setT(d.ticket))
+      .then((d) => {
+        if (d.error) setErr(d.error);
+        else if (d.ticket) setT(d.ticket);
+        // A reply with neither is a wiring fault, not a slow network. Saying
+        // so beats spinning forever on "Loading ticket".
+        else setErr("The server replied without a ticket. Check the portal route.");
+      })
       .catch(() => setErr("Could not load the ticket."));
   }, [id]);
 

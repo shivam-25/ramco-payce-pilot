@@ -22,7 +22,9 @@ export default function Knowledge() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "knowledge" }) })
       .then((r) => r.json())
-      .then((d) => d.error ? setErr(d.error) : setKb(d))
+      .then((d) => d.error ? setErr(d.error)
+        : d.documents ? setKb(d)
+        : setErr("The server replied without a corpus. Check the portal route."))
       .catch(() => setErr("Could not load the knowledge base."));
   }, []);
 
