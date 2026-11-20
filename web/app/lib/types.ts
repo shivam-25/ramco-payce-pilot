@@ -28,6 +28,7 @@ export type Stage = { box: string; ms: number | null; note: string };
 export type Row = {
   key: string; subject: string; body: string; customer: string;
   asOf: string; note: string; dated?: boolean;
+  priority?: "P1" | "P2" | "P3" | "P4";
   state: "idle" | "running" | "done" | "failed";
   result?: Result;
   compare?: { asOf: string; result?: Result; state: "running" | "done" };
@@ -260,4 +261,47 @@ export function matches(r: Row, q: string): boolean {
   if (!n) return true;
   return [r.subject, r.body, r.customer, r.result?.draft,
           r.result?.reason].some((f) => (f || "").toLowerCase().includes(n));
+}
+
+
+// ---- what a desk actually saves -------------------------------------
+//
+// Derived from the export's own cost sheet, not assumed: 42 agent FTE
+// against 15,000 tickets a month. At a 160-hour month that is
+// 42 x 160 / 15,000 = 0.448 hours, so TODAY_MIN below is measured from the
+// customer's own numbers rather than picked to look good.
+//
+// REVIEW_MIN is the one estimate here and it is deliberately generous: a
+// drafted reply still has to be read and approved, and claiming the whole
+// 26.9 minutes back would be the sort of number that falls apart in the
+// room. Every tile that uses it says so on the tile.
+export const TODAY_MIN = 26.9;
+export const REVIEW_MIN = 4;
+export const SAVED_MIN = TODAY_MIN - REVIEW_MIN;
+
+export type Sort = "arrival" | "priority" | "slowest" | "costliest";
+
+/** Wall time for a ticket: the boxes sum to it, because every box is timed
+ *  and nothing runs in parallel inside one ticket. */
+export function totalMs(r?: Result): number {
+  if (!r) return -1;
+  return Object.values(r.timings_ms || {}).reduce((a, b) => a + b, 0);
+}
+
+const PRI = { P1: 0, P2: 1, P3: 2, P4: 3 } as const;
+
+/** Sorting is stable and never reorders mid-stream: it returns a copy, and
+ *  arrival order is the identity so "newest last" always means what it
+ *  says. */
+export function sortRows(rows: Row[], by: Sort): Row[] {
+  if (by === "arrival") return rows;
+  const copy = [...rows];
+  if (by === "priority") {
+    copy.sort((a, b) => (PRI[a.priority ?? "P3"] - PRI[b.priority ?? "P3"]));
+  } else if (by === "slowest") {
+    copy.sort((a, b) => totalMs(b.result) - totalMs(a.result));
+  } else {
+    copy.sort((a, b) => (b.result?.usd ?? -1) - (a.result?.usd ?? -1));
+  }
+  return copy;
 }

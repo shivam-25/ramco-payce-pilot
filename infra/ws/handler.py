@@ -128,7 +128,8 @@ def handler(event, _context):
 
     # The same allow-list the buffered proxy uses. A caller cannot reach
     # through this socket and start an eval sweep on the account's budget.
-    allowed = {"subject", "body", "customer_id", "as_of", "use_cache"}
+    allowed = {"subject", "body", "customer_id", "as_of", "use_cache",
+               "priority"}
     clean = {k: v for k, v in payload.items() if k in allowed}
     # Read after auth so an unauthenticated caller cannot have its id
     # reflected, and bounded so it cannot be used to pad frames.

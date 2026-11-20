@@ -29,6 +29,12 @@ class Invocation(BaseModel):
     as_of: str | None = None
     use_cache: bool = True
     stream: bool = False
+    # P1 is the one priority the router acts on by itself -- "payroll cannot
+    # run or people will not be paid" goes straight to a person. The console
+    # used to send nothing, so every ticket arrived P3 and a message reading
+    # "payroll is blocked and today is the cut-off" came back drafted. The
+    # wording is not the signal; the field is.
+    priority: str | None = None
 
     # Retrieval sweep, used by the bake-off. The databases are private, so
     # the runtime inside the VPC is the only place this can run. It is not
@@ -278,7 +284,11 @@ def _ticket_from(payload: "Invocation"):
         "subject": payload.subject or "",
         "body": payload.body or "",
         "category": "",
-        "priority": "P3",
+        # Anything we do not recognise is P3, the default the desk uses.
+        # A caller must not be able to invent a priority the router has
+        # never been evaluated against.
+        "priority": (payload.priority
+                     if payload.priority in {"P1", "P2", "P3", "P4"} else "P3"),
         "status": "open",
         "received_at": datetime.utcnow().isoformat(),
         "from_email": "",

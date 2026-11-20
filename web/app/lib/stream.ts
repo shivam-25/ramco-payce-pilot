@@ -7,7 +7,8 @@ export type Handlers = {
   onDraftBegin: () => void;
 };
 
-type Sent = { subject: string; body: string; customer: string; asOf: string };
+type Sent = { subject: string; body: string; customer: string; asOf: string;
+              priority?: string };
 
 // One socket for the page, not one per ticket. API Gateway bills a connection
 // by the minute and a handshake costs the best part of a second, so opening a
@@ -71,7 +72,8 @@ export function streamTicket(url: string, key: string, row: Sent,
     ws.addEventListener("message", onMsg);
     ws.send(JSON.stringify({
       key, rid, subject: row.subject, body: row.body,
-      customer_id: row.customer, as_of: row.asOf, use_cache: useCache,
+      customer_id: row.customer, as_of: row.asOf,
+      priority: row.priority, use_cache: useCache,
     }));
   }));
 }

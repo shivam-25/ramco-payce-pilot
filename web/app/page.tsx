@@ -5,7 +5,9 @@ import { TICKETS, BURST, type Demo, FEED } from "./lib/demo";
 import { status, withMarkers, period, pretty, pool, readable, heading, neutralise,
          score, stale, type Row, type Result, type Source,
          type Stage,
-         bucket, matches, type Bucket } from "./lib/types";
+         bucket, matches, type Bucket,
+         sortRows, type Sort } from "./lib/types";
+import { Gauge, Saved, Split, Speed } from "./charts";
 import { streamTicket } from "./lib/stream";
 
 // What to call each identifier in front of an agent. "AADHAAR" is how the
@@ -28,10 +30,12 @@ function piiName(key: string, n: number): string {
 
 const mk = (d: Demo): Row => ({
   key: d.id, subject: d.subject, body: d.body, customer: d.customer,
-  asOf: d.asOf, note: d.note, dated: d.dated, state: "idle",
+  asOf: d.asOf, note: d.note, dated: d.dated, priority: d.priority,
+  state: "idle",
 });
 
-async function triage(row: { subject: string; body: string; customer: string; asOf: string },
+async function triage(row: { subject: string; body: string; customer: string;
+                             asOf: string; priority?: string },
                       useCache = true) {
   const res = await fetch("/api/triage", {
     method: "POST", headers: { "content-type": "application/json" },
@@ -56,6 +60,7 @@ export default function Console() {
   // which is the opposite of the point.
   const [filter, setFilter] = useState<Bucket | "all">("all");
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<Sort>("arrival");
   const filterRef = useRef<Bucket | "all">("all");
   const queryRef = useRef("");
   useEffect(() => { filterRef.current = filter; }, [filter]);
@@ -135,7 +140,7 @@ export default function Console() {
       const key = `${d.id}-${n}`;
       const row: Row = { key, subject: d.subject, body: d.body,
                          customer: d.customer, asOf: d.asOf, note: d.note,
-                         state: "running" };
+                         priority: d.priority, state: "running" };
       setRows((rs) => [...rs, row]);
       // Following is for watching the queue, not for fighting a filter. If
       // you have narrowed to "to you" or typed a search, an arriving ticket
@@ -212,8 +217,9 @@ export default function Console() {
   // screen, so the chips, the tally and the rows can never disagree.
   const counts = rows.reduce((a, r) => { a[bucket(r)] += 1; return a; },
     { ready: 0, person: 0, refused: 0, waiting: 0 } as Record<Bucket, number>);
-  const shown = rows.filter((r) =>
-    (filter === "all" || bucket(r) === filter) && matches(r, query));
+  const shown = sortRows(
+    rows.filter((r) => (filter === "all" || bucket(r) === filter)
+                       && matches(r, query)), sortBy);
 
   // Narrowing the queue must not strand you on a ticket the filter hides:
   // the reply pane would still show it while the list insists it is not
@@ -285,6 +291,15 @@ export default function Console() {
                 </button>
               ))}
             </div>
+            <label className="sortby">
+              Sort
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as Sort)}>
+                <option value="arrival">as they arrived</option>
+                <option value="priority">by priority</option>
+                <option value="slowest">slowest first</option>
+                <option value="costliest">most expensive first</option>
+              </select>
+            </label>
             <p className="rail">
               {shown.length === rows.length
                 ? `Queue · ${rows.length}`
@@ -307,6 +322,9 @@ export default function Console() {
               <button key={r.key} onClick={() => choose(r.key)}
                       className={`item ${curKey === r.key ? "on" : ""}`}>
                 <span className={`dot ${r.state === "running" ? "run" : s ? s.tone : "idle"}`} />
+                {r.priority && r.priority !== "P3" && (
+                  <span className={`pri ${r.priority}`}>{r.priority}</span>
+                )}
                 <span className="itext">
                   <span className="isub">{r.subject}</span>
                   <span className="imeta">
@@ -365,6 +383,14 @@ export default function Console() {
           {/* The counts are the filter. Reading "27 to you" and having no way
               to see those 27 is the kind of dead end that makes a dashboard
               feel like a poster. */}
+          <div className="charts">
+            <Saved rows={rows} />
+            <Gauge pct={parseFloat(board.alone)} label="Handled without you"
+                   sub={`${board.drafted} of ${board.seen} needed nobody`} />
+            <Split s={board} />
+            <Speed rows={rows} />
+          </div>
+
           <div className="tallies">
             <button onClick={() => setFilter("all")}><b>{board.seen}</b> handled</button>
             <button className="ok" onClick={() => setFilter("ready")}>

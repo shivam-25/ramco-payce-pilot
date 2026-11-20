@@ -271,3 +271,39 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .tallies button:hover { color: var(--fg); }
 .tallies button:hover b { text-decoration: underline;
                           text-underline-offset: 3px; }
+
+/* ---- the impact row ---------------------------------------------------
+   Four small charts above the tally. Inline SVG, sized by the grid, so they
+   reflow rather than scroll on a narrow screen. */
+.charts { display: grid; gap: 14px; margin-bottom: 12px;
+          grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .charts { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .charts { grid-template-columns: 1fr; } }
+.chart { margin: 0; min-width: 0; }
+.chart svg { width: 100%; display: block; }
+.chart figcaption { display: flex; flex-direction: column; gap: 2px; margin-top: 5px; }
+.chart figcaption b { font-size: 11.5px; font-weight: 600; color: var(--fg); }
+.chart figcaption span { font-size: 10.5px; line-height: 1.35; color: var(--dim); }
+.gauge svg { height: 62px; }
+.gnum { fill: var(--fg); font-family: var(--mono); font-size: 17px;
+        font-weight: 600; }
+.saved .big { margin: 0 0 2px; font-family: var(--mono); font-size: 19px;
+              color: var(--ok); font-weight: 600; }
+.saved svg { height: 42px; }
+.split svg { height: 14px; margin-top: 22px; }
+.speed svg { height: 44px; margin-top: 14px; }
+
+/* Sort control and the priority badge. P3 is the desk default and is never
+   badged -- a badge on everything is a badge on nothing. */
+.sortby { display: flex; align-items: center; gap: 6px; margin: 0 0 6px;
+          font-size: 11.5px; color: var(--dim); }
+.sortby select { font: inherit; font-size: 11.5px; color: var(--fg);
+                 background: var(--card); border: 1px solid var(--line);
+                 border-radius: 6px; padding: 2px 4px; }
+.pri { font-family: var(--mono); font-size: 9.5px; font-weight: 700;
+       padding: 1px 4px; border-radius: 4px; margin-top: 6px;
+       flex: 0 0 auto; letter-spacing: .04em; }
+.pri.P1 { color: #fff; background: var(--accent); }
+.pri.P2 { color: var(--warn, #F2B134);
+          border: 1px solid color-mix(in srgb, var(--warn, #F2B134) 45%, transparent); }
+.pri.P4 { color: var(--dim); border: 1px solid var(--line); }

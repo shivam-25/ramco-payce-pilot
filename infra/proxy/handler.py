@@ -109,7 +109,8 @@ def handler(event, _context):
 
     # Only the fields the pilot accepts are forwarded. A caller cannot reach
     # through this function and hand the runtime an arbitrary document.
-    allowed = {"subject", "body", "customer_id", "as_of", "use_cache"}
+    allowed = {"subject", "body", "customer_id", "as_of", "use_cache",
+               "priority"}
     clean = {k: v for k, v in payload.items() if k in allowed}
 
     try:
