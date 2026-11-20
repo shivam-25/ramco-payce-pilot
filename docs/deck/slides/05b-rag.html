@@ -1,0 +1,95 @@
+<!DOCTYPE html><html><head><style>
+html{background:#0B0E14;}
+body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
+.slide{margin:0;padding:30pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:10pt;margin:0 0 7pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:27pt;margin:0 0 4pt 0;letter-spacing:-0.5pt;line-height:1.12;}
+.sub{color:#8B95A7;font-size:10.5pt;margin:0 0 14pt 0;line-height:1.4;}
+.mono{font-family:'Courier New',monospace;}
+.two{display:flex;gap:16pt;}
+.col{width:312pt;}
+.ct{color:#E6E9EF;font-size:11pt;font-weight:bold;margin:0 0 8pt 0;}
+.step{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:7pt 10pt;margin:0 0 5pt 0;}
+.step.hi{border:1.5pt solid #3ECF8E;background:#101A16;}
+.sn{color:#E6E9EF;font-size:10.5pt;font-weight:bold;margin:0;}
+.sd{color:#8B95A7;font-size:9pt;margin:2pt 0 0 0;font-family:'Courier New',monospace;}
+table{border-collapse:collapse;width:312pt;}
+th{color:#8B95A7;font-size:8.5pt;text-align:left;padding:0 5pt 5pt 0;font-family:'Courier New',monospace;font-weight:normal;letter-spacing:0.4pt;}
+td{color:#C6CCD8;font-size:9.5pt;padding:4pt 5pt 4pt 0;font-family:'Courier New',monospace;border-top:1px solid #1D242F;}
+td.n{color:#E6E9EF;}
+tr.win td{color:#3ECF8E;font-weight:bold;}
+.note{color:#8B95A7;font-size:9.5pt;margin:9pt 0 0 0;line-height:1.45;}
+</style></head><body><div class="slide">
+<p class="kicker">RETRIEVAL &nbsp;·&nbsp; CHOSEN BY BAKE-OFF, NOT BY ASSUMPTION</p>
+<h1>The strategy I shipped loses the leaderboard.</h1>
+<p class="sub">4 chunking &times; 4 retrieval strategies, 35 golden questions at k=5, scored with set arithmetic &mdash; no model judge.</p>
+<div class="two">
+<div class="col">
+  <p class="ct">The retrieval path</p>
+  <div class="step"><p class="sn">Chunk on headings, carry the trail</p><p class="sd">doc title + heading + effective dates</p></div>
+  <div class="step"><p class="sn">Embed &mdash; Titan v2 @ 512 dims</p><p class="sd">no loss vs 1024 here &middot; half the index</p></div>
+  <div class="step hi"><p class="sn">Filter to the rule in force on the date</p><p class="sd">SQL, before ranking &mdash; not after</p></div>
+  <div class="step"><p class="sn">Rank twice &mdash; pgvector HNSW + tsvector</p><p class="sd">dense for meaning, lexical for IDs</p></div>
+  <div class="step"><p class="sn">Fuse with Reciprocal Rank Fusion</p><p class="sd">no score calibration needed</p></div>
+</div>
+<div class="col">
+  <p class="ct">Why the winner is not the top row</p>
+  <table>
+  <tr><th>STRATEGY</th><th>MRR</th><th>PREC</th><th>DATE</th></tr>
+  <tr class="win"><td>R4 hybrid + dated</td><td>0.87</td><td>0.46</td><td>1.00</td></tr>
+  <tr><td>R3 hybrid</td><td class="n">0.92</td><td class="n">0.50</td><td style="color:#E8336D;">0.40</td></tr>
+  <tr><td>R1 dense only</td><td class="n">0.89</td><td class="n">0.51</td><td style="color:#E8336D;">0.40</td></tr>
+  <tr><td>R2 lexical only</td><td>0.23</td><td>0.21</td><td style="color:#E8336D;">0.00</td></tr>
+  </table>
+  <p class="note">Plain hybrid beats the winner on <span class="mono">every</span> metric a bake-off normally reports &mdash; and gets 3 of 5 dated questions wrong. Those are the questions that caused the incident.</p>
+  <p class="note">Choosing on MRR would have shipped the vendor&rsquo;s bug again, with better numbers attached.</p>
+</div>
+</div>
+</div></body></html>
+<!--NOTES
+This is the slide that proves the measurement was real rather than decorative.
+
+"Four chunking strategies, four retrieval strategies, thirty-five golden
+questions. Scored with set arithmetic, not a judge model, so the measurement
+can't flatter itself."
+
+Point at the table: "Look at the second row. By every metric a retrieval
+bake-off normally reports -- MRR, precision -- plain hybrid BEATS what I
+shipped. It is also wrong on three of the five date-dependent questions."
+
+"Those are exactly the questions that caused the incident this pilot exists to
+prevent. So I shipped the strategy that loses the leaderboard and is right
+about dates. Choosing on MRR would have shipped the vendor's bug again, with
+better numbers attached."
+
+The left column if asked: the date filter runs in SQL BEFORE ranking, not
+after -- filtering after the search silently shrinks k, which is how you
+retrieve five passages and keep one.
+
+A hypothesis that died: lexical-only scored 0.23. Tickets say "salary not
+credited", rules say "wage ceiling" -- keyword matching has nothing to grip.
+Kept in the fusion only because it rescues exact IDs like PNJ-5107 that
+embeddings blur.
+
+EXPECT THIS QUESTION: "why no re-ranker?" Three answers, in order:
+
+1. It would optimise the part that already works. Ordering is MRR 0.95,
+   nDCG 0.95, hit@5 0.97 -- about 0.05 of headroom. Faithfulness and corpus
+   coverage are the bottleneck, not ranking.
+2. No re-ranker model exists on this account. ap-southeast-2 has no
+   amazon.rerank or cohere.rerank, only Cohere EMBEDDING models, and the SCP
+   pins us to that region. Self-hosting a cross-encoder means Torch and
+   weights in a 24MB artifact plus CPU inference on the request path.
+3. The affordable substitute -- one Nova Micro call scoring 15 candidates --
+   is ~$0.00002 and 300ms. That 300ms lands on a path with a 3-second gate,
+   to win 0.05 of MRR.
+
+And be precise if pushed: RRF is FUSION, not re-ranking. It reorders two
+existing rankings; it never scores query and passage jointly, so it is not a
+cross-encoder and I don't claim it as one.
+
+Other specifics if asked: Titan embed v2 at 512 dims (no measured loss vs
+1024, half the index). pgvector HNSW over IVFFlat because the corpus is small
+and read-heavy -- slower build, faster queries, no training step or list
+tuning. RRF k=60, the original paper's constant. Top-5 out.
+-->
