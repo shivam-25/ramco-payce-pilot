@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { TICKETS, BURST, type Demo, FEED } from "./lib/demo";
 import { status, withMarkers, period, pretty, pool, readable, heading, neutralise,
          score, stale, type Row, type Result, type Source,
-         type Stage } from "./lib/types";
+         type Stage,
+         bucket, matches, type Bucket } from "./lib/types";
 import { streamTicket } from "./lib/stream";
 
 // What to call each identifier in front of an agent. "AADHAAR" is how the
@@ -53,6 +54,12 @@ export default function Console() {
   // it stops and leaves you on it. Without this the selection is yanked away
   // every couple of seconds and an arriving queue is impossible to read --
   // which is the opposite of the point.
+  const [filter, setFilter] = useState<Bucket | "all">("all");
+  const [query, setQuery] = useState("");
+  const filterRef = useRef<Bucket | "all">("all");
+  const queryRef = useRef("");
+  useEffect(() => { filterRef.current = filter; }, [filter]);
+  useEffect(() => { queryRef.current = query; }, [query]);
   const [follow, setFollow] = useState(true);
   const followRef = useRef(true);
   const choose = (key: string) => {
@@ -130,7 +137,11 @@ export default function Console() {
                          customer: d.customer, asOf: d.asOf, note: d.note,
                          state: "running" };
       setRows((rs) => [...rs, row]);
-      if (followRef.current) setSel(key);
+      // Following is for watching the queue, not for fighting a filter. If
+      // you have narrowed to "to you" or typed a search, an arriving ticket
+      // that does not match must not drag you off what you are reading.
+      if (followRef.current && filterRef.current === "all" && !queryRef.current)
+        setSel(key);
       try {
         const result = await runOne(row, false);
         patch(key, { state: result.error ? "failed" : "done", result,
@@ -193,10 +204,31 @@ export default function Console() {
     patch(key, { compare: { asOf, state: "done", result } });
   }
 
-  const cur = rows.find((r) => r.key === sel) ?? rows[0];
   const done = rows.filter((r) => r.state === "done" && r.result);
   const incident = done.find((r) => r.result!.incident);
   const board = score(rows);
+
+  // One pass over the queue gives both the pile counts and the list on
+  // screen, so the chips, the tally and the rows can never disagree.
+  const counts = rows.reduce((a, r) => { a[bucket(r)] += 1; return a; },
+    { ready: 0, person: 0, refused: 0, waiting: 0 } as Record<Bucket, number>);
+  const shown = rows.filter((r) =>
+    (filter === "all" || bucket(r) === filter) && matches(r, query));
+
+  // Narrowing the queue must not strand you on a ticket the filter hides:
+  // the reply pane would still show it while the list insists it is not
+  // there. Fall back to the first row that survives.
+  const curKey = shown.some((r) => r.key === sel) ? sel : shown[0]?.key;
+
+  const PILES: { id: Bucket | "all"; label: string; n: number }[] = [
+    { id: "all", label: "All", n: rows.length },
+    { id: "ready", label: "Drafted", n: counts.ready },
+    { id: "person", label: "To you", n: counts.person },
+    { id: "refused", label: "Refused", n: counts.refused },
+    { id: "waiting", label: "Waiting", n: counts.waiting },
+  ];
+
+  const cur = rows.find((r) => r.key === curKey) ?? shown[0] ?? rows[0];
 
   return (
     <main className="shell">
@@ -240,12 +272,40 @@ export default function Console() {
 
       <div className="split">
         <nav className="list">
-          <p className="rail">Queue · {rows.length}</p>
-          {rows.map((r) => {
+          <div className="qhead">
+            <input className="find" type="search" value={query}
+                   placeholder="Search tickets, replies, customer"
+                   onChange={(e) => setQuery(e.target.value)} />
+            <div className="chips">
+              {PILES.map((pl) => (
+                <button key={pl.id}
+                        className={`chip ${filter === pl.id ? "on" : ""} c-${pl.id}`}
+                        onClick={() => setFilter(pl.id)}>
+                  {pl.label} <b>{pl.n}</b>
+                </button>
+              ))}
+            </div>
+            <p className="rail">
+              {shown.length === rows.length
+                ? `Queue · ${rows.length}`
+                : `Showing ${shown.length} of ${rows.length}`}
+            </p>
+          </div>
+
+          {shown.length === 0 && (
+            <p className="none">
+              Nothing matches.
+              <button className="link" onClick={() => { setQuery(""); setFilter("all"); }}>
+                Clear
+              </button>
+            </p>
+          )}
+
+          {shown.map((r) => {
             const s = r.result ? status(r.result) : null;
             return (
               <button key={r.key} onClick={() => choose(r.key)}
-                      className={`item ${sel === r.key ? "on" : ""}`}>
+                      className={`item ${curKey === r.key ? "on" : ""}`}>
                 <span className={`dot ${r.state === "running" ? "run" : s ? s.tone : "idle"}`} />
                 <span className="itext">
                   <span className="isub">{r.subject}</span>
@@ -302,11 +362,19 @@ export default function Console() {
 
       {board && (
         <footer className="scorebar">
+          {/* The counts are the filter. Reading "27 to you" and having no way
+              to see those 27 is the kind of dead end that makes a dashboard
+              feel like a poster. */}
           <div className="tallies">
-            <span><b>{board.seen}</b> handled</span>
-            <span className="ok"><b>{board.drafted}</b> drafted</span>
-            <span className="warn"><b>{board.toPerson}</b> to you</span>
-            {board.refused > 0 && <span className="bad"><b>{board.refused}</b> refused</span>}
+            <button onClick={() => setFilter("all")}><b>{board.seen}</b> handled</button>
+            <button className="ok" onClick={() => setFilter("ready")}>
+              <b>{board.drafted}</b> drafted</button>
+            <button className="warn" onClick={() => setFilter("person")}>
+              <b>{board.toPerson}</b> to you</button>
+            {board.refused > 0 && (
+              <button className="bad" onClick={() => setFilter("refused")}>
+                <b>{board.refused}</b> refused</button>
+            )}
             <span className="sp">{board.spend} spent</span>
           </div>
           <dl className="board">

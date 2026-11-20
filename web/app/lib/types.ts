@@ -233,3 +233,27 @@ export function score(rows: Row[]): Score | null {
     spend: `$${done.reduce((a, r) => a + (r.result!.usd || 0), 0).toFixed(4)}`,
   };
 }
+
+
+/** Which pile a ticket belongs in. The same test the tally counts with, so
+ *  clicking "9 to you" shows exactly the nine it counted -- a filter that
+ *  disagrees with the number above it is worse than no filter. */
+export type Bucket = "ready" | "person" | "refused" | "waiting";
+
+export function bucket(r: Row): Bucket {
+  if (r.state !== "done" || !r.result) return "waiting";
+  if (/injection/i.test(r.result.reason || "")) return "refused";
+  return r.result.route !== "human" && !r.result.needs_approval
+    ? "ready" : "person";
+}
+
+/** Plain substring search over everything the agent can see: what the
+ *  customer wrote, who they are, and the reply if there is one. Not fuzzy
+ *  and not ranked -- at desk scale that is a cost with no benefit, and a
+ *  search that quietly reorders results is hard to trust. */
+export function matches(r: Row, q: string): boolean {
+  const n = q.trim().toLowerCase();
+  if (!n) return true;
+  return [r.subject, r.body, r.customer, r.result?.draft,
+          r.result?.reason].some((f) => (f || "").toLowerCase().includes(n));
+}
