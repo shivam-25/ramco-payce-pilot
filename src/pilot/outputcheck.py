@@ -115,6 +115,32 @@ def _numbers_in(text: str) -> set[str]:
 # model is refusing to invent a number it was never given — but they are not
 # an answer, and a customer who gets one has been charged a round trip for
 # nothing.
+# C10 -- a claim about what the product cannot do.
+#
+# The drafting prompt already forbids this in as many words, and names the
+# exact sentence as an example of a guess: "The system does not support
+# exporting these together". The model wrote that sentence anyway, cited a
+# P1 incident about payslip PDFs rendering net pay as zero, and passed every
+# check -- because saying a feature does not exist uses no money, no
+# duration, no tracker id and no internal voice.
+#
+# A rule the model is asked to follow is a hope. The same rule in code is a
+# gate. Whether a feature exists is a claim about the product like any
+# other, and this corpus holds rules, runbooks and contracts, not a feature
+# list, so the passages almost never support one. When the draft denies a
+# capability and no passage denies it too, the ticket goes to a person who
+# can actually check the product.
+_CAPABILITY_DENIAL = re.compile(
+    r"\b(?:does\s+not|doesn'?t|do\s+not|don'?t)\s+(?:currently\s+)?"
+    r"(?:support|allow|permit|offer|provide|have)\b"
+    r"|\bis\s+not\s+(?:supported|available|possible|offered|provided)\b"
+    r"|\bare\s+not\s+(?:supported|available|possible)\b"
+    r"|\b(?:cannot|can'?t|can\s+not)\s+be\s+\w+ed\b"
+    r"|\bthere\s+is\s+no\s+(?:option|way|feature|setting|support)\b"
+    r"|\bnot\s+possible\s+to\b"
+    r"|\bno\s+such\s+(?:option|feature|setting)\b",
+    re.I)
+
 _POINTER_ONLY = re.compile(
     r"\b(refer to|see|consult|available in|documented in|found in|"
     r"please check|more details in)\b[^.]{0,60}"
@@ -176,6 +202,18 @@ def check(draft, *, tier: str | None = None, priority: str = "P3",
     if voice:
         fails.append("C9_internal_voice")
         detail["internal_voice"] = voice[:3]
+
+    # C10 — a denial of a product capability needs a passage that denies it.
+    # Checked against the passages before the citation check so that the
+    # reason a person gets the ticket is the interesting one.
+    passages_so_far = "\n".join(h.text for h in draft.passages)
+    denial = _CAPABILITY_DENIAL.findall(text)
+    if denial and not _CAPABILITY_DENIAL.search(passages_so_far):
+        fails.append("C10_capability_claim")
+        detail["C10_capability_claim"] = (
+            "the reply states what the product cannot do, and no retrieved "
+            "passage says so; this corpus holds rules, runbooks and "
+            "contracts, not a feature list")
 
     # C1 — a draft with no citation is ungrounded by definition.
     if not draft.citations:
