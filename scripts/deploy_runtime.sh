@@ -98,7 +98,26 @@ SUBNET_JSON=$(echo "$SUBNETS" | awk -F, '{for(i=1;i<=NF;i++) printf "%s\"%s\"", 
 # not about enabling it.
 NET="{\"networkMode\":\"VPC\",\"networkModeConfig\":{\"securityGroups\":[\"$SG\"],\"subnets\":[$SUBNET_JSON]}}"
 PROTO='{"serverProtocol":"HTTP","port":8080,"path":"/invocations"}'
-ENVV="{\"RAMCO_DB_HOST_IN\":\"$EP_IN\",\"RAMCO_DB_HOST_UAE\":\"$EP_UAE\",\"AWS_REGION\":\"$REGION\",\"PYTHONPATH\":\"/app/src\"}"
+# Defence 1.5. Resolved by name so the deploy does not carry a stale id:
+# if the guardrail is absent these stay empty, guardrail.configured()
+# returns false, and the pipeline runs on the regex screens alone.
+GR_ID=$(aws bedrock list-guardrails --region "$REGION" \
+          --query "guardrails[?name=='ramco-payce-pilot']|[0].id" \
+          --output text 2>/dev/null || echo "")
+[ "$GR_ID" = "None" ] && GR_ID=""
+if [ -n "$GR_ID" ]; then
+  GR_VER=$(aws bedrock list-guardrails --region "$REGION" \
+            --query "guardrails[?name=='ramco-payce-pilot']|[0].version" \
+            --output text)
+  [ "$GR_VER" = "None" ] || [ -z "$GR_VER" ] && GR_VER=1
+else
+  GR_VER=""
+  echo "WARNING: no guardrail found -- deploying with regex screens only."
+  echo "         run ./scripts/setup_guardrail.sh first."
+fi
+echo "guardrail: ${GR_ID:-none} v${GR_VER:-?}"
+
+ENVV="{\"RAMCO_DB_HOST_IN\":\"$EP_IN\",\"RAMCO_DB_HOST_UAE\":\"$EP_UAE\",\"AWS_REGION\":\"$REGION\",\"PYTHONPATH\":\"/app/src\",\"GUARDRAIL_ID\":\"$GR_ID\",\"GUARDRAIL_VERSION\":\"$GR_VER\"}"
 
 ID=$(aws bedrock-agentcore-control list-agent-runtimes \
        --query "agentRuntimes[?agentRuntimeName=='$NAME'].agentRuntimeId" --output text)

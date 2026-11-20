@@ -239,3 +239,29 @@ the captured demo scenarios.
 **Speaker notes are in the file.** They carry the delivery — where to pause,
 the lines worth saying verbatim, and the answers to the pushback each slide
 invites. The slides deliberately do not repeat them.
+
+
+## Defence 1.5 -- Bedrock Guardrails
+
+Added 20 Nov, after the obvious challenge to a regex screen: wording varies,
+so a paraphrase walks past the patterns, and a name nobody enumerated walks
+past the gate. Both limits were already written in the source.
+
+`ApplyGuardrail` (standalone, no attached inference call) pairs with each:
+`PROMPT_ATTACK` at HIGH for injection, managed NER for the open PII classes,
+and custom regexes for `AADHAAR`, `PAN`, `EMIRATES_ID`, `UAN` because Bedrock
+has no built-in entity type for them.
+
+**Measured, warm:** a paraphrased injection the patterns missed is BLOCKED;
+an off-roster name plus street address the gate cleared is caught as `NAME`
+and `ADDRESS` in ~295 ms.
+
+**The line to say if challenged:** concede the premise first -- it is correct.
+Then the boundary argument: this does not make the filter load-bearing. The
+boundary is the absence of capability, asserted by G4.
+
+**Setup:** `./scripts/setup_guardrail.sh` (idempotent). The runtime deploy
+resolves the guardrail by name, so it never carries a stale id; if the
+guardrail is absent it deploys with the regex screens alone and says so.
+
+Appendix slide "Regex is complete over what it enumerates" carries the table.
