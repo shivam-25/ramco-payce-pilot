@@ -22,7 +22,14 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 input[type="date"] { font: inherit; background: none; border: 0; color: var(--ink);
   font-family: var(--mono); font-size: 13px; padding: 2px 4px; border-bottom: 1px solid var(--line2); }
 
-.shell { max-width: 1040px; margin: 0 auto; padding: 36px 24px 72px; }
+/* An app shell, not a document. The console has three regions that must
+   all stay on screen while a feed runs -- the queue, the reply, the numbers
+   -- and stacking them in normal flow meant the sticky footer sat on top of
+   the reply whenever the impact panel was open. Here the middle row is the
+   only thing that scrolls, each column inside it scrolls independently, and
+   the footer simply occupies the bottom. Nothing can overlap anything. */
+.shell { max-width: 1040px; margin: 0 auto; padding: 24px 24px 0;
+         height: 100vh; display: flex; flex-direction: column; }
 
 .top { display: flex; justify-content: space-between; align-items: flex-start;
   gap: 24px; flex-wrap: wrap; }
@@ -44,7 +51,8 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
   border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); }
 .incident b { font-weight: 650; }
 
-.split { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 36px; margin-top: 30px; }
+.split { display: grid; grid-template-columns: 236px minmax(0, 1fr);
+         gap: 32px; margin-top: 22px; flex: 1 1 auto; min-height: 0; }
 @media (max-width: 860px) { .split { grid-template-columns: 1fr; gap: 24px; } }
 
 /* The queue scrolls inside itself and stays put while the reply column
@@ -54,18 +62,14 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
    fixed-height grid, so the main column keeps its natural page scroll and
    the tally stays stuck to the foot. */
 .list { display: flex; flex-direction: column; gap: 1px;
-        position: sticky; top: 16px; align-self: start;
-        max-height: calc(100vh - 150px); overflow-y: auto;
+        min-height: 0; overflow-y: auto;
         overscroll-behavior: contain;
         scrollbar-width: thin; scrollbar-color: var(--line2) transparent;
         padding-right: 4px; }
 .list::-webkit-scrollbar { width: 6px; }
 .list::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
 .list::-webkit-scrollbar-track { background: transparent; }
-@media (max-width: 860px) {
-  /* One column: a sticky, inner-scrolling sidebar would trap the page. */
-  .list { position: static; max-height: 46vh; }
-}
+
 .item { display: flex; gap: 10px; align-items: flex-start; text-align: left;
   padding: 9px 10px; border-radius: 7px; }
 .item:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
@@ -82,7 +86,9 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .tally { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line);
   font-family: var(--mono); font-size: 11px; color: var(--dim); }
 
-.work { min-width: 0; display: flex; flex-direction: column; gap: 26px; }
+.work { min-width: 0; display: flex; flex-direction: column; gap: 26px;
+        min-height: 0; overflow-y: auto; padding-right: 6px;
+        overscroll-behavior: contain; }
 
 .qmark { margin: 0; font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase;
   color: var(--dim); }
@@ -212,8 +218,8 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
    Sticky at the foot, because during a live feed it is the thing you watch:
    the counts move with every ticket and the rates settle as the sample
    grows. Above the fold it would scroll away exactly when it matters. */
-.scorebar { position: sticky; bottom: 0; z-index: 5;
-            margin: 20px -20px 0; padding: 12px 20px 14px;
+.scorebar { flex: 0 0 auto; z-index: 5;
+            margin: 0 -24px; padding: 12px 24px 14px;
             background: color-mix(in srgb, var(--bg) 92%, transparent);
             backdrop-filter: blur(8px);
             border-top: 1px solid var(--line); }
@@ -226,8 +232,14 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .tallies .bad b { color: var(--accent); }
 .tallies .sp { margin-left: auto; font-family: var(--mono); font-size: 12px; }
 .scorebar .board { margin: 0; }
-@media (max-width: 760px) {
-  .scorebar { position: static; margin: 20px 0 0; padding: 12px 0 0; }
+@media (max-width: 860px) {
+  /* One column: the shell goes back to being a document, because an
+     inner-scrolling sidebar on a phone traps the page scroll. */
+  .shell { height: auto; display: block; padding: 24px 16px 40px; }
+  .split { display: block; }
+  .list { max-height: 44vh; margin-bottom: 20px; }
+  .work { overflow: visible; height: auto; padding-right: 0; }
+  .scorebar { margin: 20px 0 0; padding: 12px 0 0; }
   .tallies .sp { margin-left: 0; }
 }
 
@@ -317,7 +329,7 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 
 /* The footer is sticky, so it must never grow past what the viewport can
    spare -- an impact panel that covers the reply is worse than no panel. */
-.scorebar { max-height: 72vh; overflow-y: auto; }
+
 .impact { font-size: 11.5px; padding: 2px 9px; border-radius: 999px;
           color: var(--dim); background: transparent;
           border: 1px solid var(--line); cursor: pointer; }
