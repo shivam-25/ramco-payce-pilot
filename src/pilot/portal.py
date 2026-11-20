@@ -184,7 +184,8 @@ def knowledge(region: str, strategy: str = "D_heading_context") -> dict:
             " WHERE strategy = %s AND source_type = 'kb' AND text LIKE %s",
             (strategy, stub_like)).fetchone()
         rules = conn.execute(
-            "SELECT rule_id, name, new_value, effective_from "
+            "SELECT rule_id, topic, title, old_value, new_value, "
+            "       effective_from, effective_to "
             "  FROM statutory_rules ORDER BY effective_from").fetchall()
 
     docs = [{"type": r["source_type"], "id": r["source_id"],
@@ -195,8 +196,11 @@ def knowledge(region: str, strategy: str = "D_heading_context") -> dict:
         "documents": docs,
         "indexed_chunks": sum(d["chunks"] for d in docs),
         "empty_kb_articles": int(stubs["n"]) if stubs else 0,
-        "rules": [{"id": r["rule_id"], "name": r["name"],
-                   "value": str(r["new_value"]),
-                   "from": str(r["effective_from"])} for r in rules],
+        "rules": [{"id": r["rule_id"],
+                   "name": r["title"] or r["topic"],
+                   "value": str(r["new_value"] or ""),
+                   "was": str(r["old_value"] or ""),
+                   "from": str(r["effective_from"] or ""),
+                   "to": str(r["effective_to"] or "")} for r in rules],
         "strategy": strategy,
     }
