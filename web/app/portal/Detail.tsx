@@ -12,8 +12,13 @@ type Full = {
 type Run = {
   route?: string; reason?: string; draft?: string; usd?: number;
   needs_approval?: boolean; queue?: string; masked_text?: string;
-  citations?: unknown[]; sources?: { source_id: string; heading?: string;
-    effective_from?: string; effective_to?: string }[];
+  citations?: string[];
+  // What the pipeline actually sends for a passage: a similarity, the
+  // heading, and a snippet. The source id travels in `citations`, in the
+  // same order, which is why this is optional here.
+  sources?: { sim?: number; heading?: string; snippet?: string;
+              source_id?: string; effective_from?: string;
+              effective_to?: string }[];
   priority?: string; cost?: { usd: number; by_model: Record<string,
     { calls: number; in: number; out: number; usd: number }> };
   output_check?: Record<string, string>; timings_ms?: Record<string, number>;
@@ -29,6 +34,29 @@ const STAGE_LABEL: Record<string, string> = {
   output_check: "Output check", cache: "Cache",
 };
 const MODEL_STAGES = new Set(["classify", "draft", "answer", "judge"]);
+
+/** Anything the server sends, rendered as text.
+ *
+ *  React throws on an object child, and the fields below are shaped by the
+ *  pipeline rather than by this file: a stage that starts returning
+ *  {code, detail} where it used to return a string would take the whole
+ *  page down. One page-level crash is a worse failure than one ugly cell,
+ *  so unknown shapes are printed instead of thrown. */
+function txt(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) return v.map(txt).filter(Boolean).join(", ");
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    for (const k of ["reason", "detail", "message", "name", "label", "code"]) {
+      if (typeof o[k] === "string") return o[k] as string;
+    }
+    const parts = Object.entries(o).map(([k, x]) => `${k}: ${txt(x)}`);
+    return parts.join(" · ");
+  }
+  return String(v);
+}
 
 function stamp(iso: string): string {
   if (!iso) return "—";
@@ -133,7 +161,7 @@ export default function Detail({ id, onBack, onChanged }:
         <aside className="dcol">
           <p className="dh">Requester</p>
           <dl className="dfacts">
-            <dt>Region</dt><dd>{t.region}</dd>
+            <dt>Region</dt><dd>{txt(t.region)}</dd>
             <dt>Tier</dt><dd>{t.tier || "—"}</dd>
             <dt>Channel</dt><dd>{t.channel || "—"}</dd>
             <dt>Received</dt><dd>{stamp(t.received_at)}</dd>
@@ -142,14 +170,14 @@ export default function Detail({ id, onBack, onChanged }:
 
           <p className="dh">Properties</p>
           <dl className="dfacts">
-            <dt>Status</dt><dd>{t.state}</dd>
+            <dt>Status</dt><dd>{txt(t.state)}</dd>
             <dt>Queue</dt><dd>{t.queue || "—"}</dd>
             <dt>Intake queue</dt><dd>{t.queue_intake || "—"}</dd>
-            <dt>Category</dt><dd>{t.category}</dd>
+            <dt>Category</dt><dd>{txt(t.category)}</dd>
             {t.raw_category && t.raw_category !== t.category &&
-              <><dt>As filed</dt><dd>{t.raw_category}</dd></>}
+              <><dt>As filed</dt><dd>{txt(t.raw_category)}</dd></>}
             <dt>Grouped as</dt><dd>{t.case_id || "first report"}</dd>
-            {run && <><dt>Routing rule</dt><dd>{run.reason}</dd>
+            {run && <><dt>Routing rule</dt><dd>{txt(run.reason)}</dd>
               <dt>Decided by</dt>
               <dd>{run.route === "human" ? "rule → a person" : "rule"}</dd>
               <dt>Human intervention</dt>
@@ -165,7 +193,7 @@ export default function Detail({ id, onBack, onChanged }:
           {gateCounts.length === 0
             ? <p className="dnote">No identifiers found in this one.</p>
             : <ul className="dchips">{gateCounts.map(([k, v]) =>
-                <li key={k}>{v} × {k}</li>)}</ul>}
+                <li key={k}>{txt(v)} × {k}</li>)}</ul>}
           <p className="dnote">Counted when the ticket was written. The columns
             below are the masked ones; there is no unmasked column to read.</p>
 
@@ -177,20 +205,26 @@ export default function Detail({ id, onBack, onChanged }:
         <section className="dmain">
           <article className="dmsg customer">
             <p className="dwho">Customer · {t.channel || "email"} · {stamp(t.received_at)}</p>
-            <p className="dsubj">{t.subject}</p>
-            <p className="dbody"><Masked text={t.body || "(no body on this ticket)"} /></p>
+            <p className="dsubj">{txt(t.subject)}</p>
+            <p className="dbody"><Masked text={txt(t.body) || "(no body on this ticket)"} /></p>
           </article>
 
           {run?.draft ? (
             <article className="dmsg bot">
               <p className="dwho">Drafted reply · not sent</p>
-              <p className="dbody">{run.draft}</p>
+              <p className="dbody">{txt(run.draft)}</p>
               {!!run.sources?.length && (
                 <ul className="dsrc">
                   {run.sources.map((s, i) => (
-                    <li key={i}><span className="mono">{s.source_id}</span>
-                      {s.heading ? ` · ${s.heading}` : ""}
-                      {s.effective_from ? ` · in force from ${s.effective_from}` : ""}</li>
+                    <li key={i}>
+                      <span className="mono">
+                        {txt(s.source_id) || txt(run.citations?.[i]) || `passage ${i + 1}`}
+                      </span>
+                      {s.heading ? ` · ${txt(s.heading)}` : ""}
+                      {s.effective_from
+                        ? ` · in force from ${txt(s.effective_from)}` : ""}
+                      {typeof s.sim === "number" ? ` · ${s.sim.toFixed(3)}` : ""}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -198,7 +232,7 @@ export default function Detail({ id, onBack, onChanged }:
           ) : run ? (
             <article className="dmsg held">
               <p className="dwho">Nothing drafted</p>
-              <p className="dbody">{run.reason}</p>
+              <p className="dbody">{txt(run.reason)}</p>
             </article>
           ) : (
             <article className="dmsg empty">
@@ -237,7 +271,7 @@ export default function Detail({ id, onBack, onChanged }:
             <>
               <p className="dh">What the model saw</p>
               {run.masked_text
-                ? <p className="dmasked"><Masked text={run.masked_text} /></p>
+                ? <p className="dmasked"><Masked text={txt(run.masked_text)} /></p>
                 : <p className="dnote">Nothing reached a model.</p>}
 
               <p className="dh">LLM analysis</p>
@@ -249,13 +283,13 @@ export default function Detail({ id, onBack, onChanged }:
                         {m.split(".").pop()} · {d.calls} call{d.calls === 1 ? "" : "s"}
                       </span>)
                   : "none — refused before a model"}</dd>
-                <dt>Priority</dt><dd>{run.priority || t.priority}</dd>
-                <dt>Summary</dt><dd>{run.reason}</dd>
+                <dt>Priority</dt><dd>{txt(run.priority) || txt(t.priority)}</dd>
+                <dt>Summary</dt><dd>{txt(run.reason)}</dd>
               </dl>
 
               <p className="dh">Decision</p>
               <dl className="dfacts">
-                <dt>Route</dt><dd>{run.route}</dd>
+                <dt>Route</dt><dd>{txt(run.route)}</dd>
                 <dt>Approval</dt><dd>{run.needs_approval ? "a person decides" : "not required"}</dd>
                 <dt>Cost</dt><dd>${(run.usd ?? 0).toFixed(6)}</dd>
                 <dt>Cache</dt><dd>{run.cache_hit ? "reused" : "fresh"}</dd>
@@ -265,7 +299,7 @@ export default function Detail({ id, onBack, onChanged }:
                   <p className="dh">Held back by</p>
                   <ul className="dchips">
                     {Object.entries(run.output_check!).map(([k, v]) =>
-                      <li key={k}>{v}</li>)}
+                      <li key={k}>{txt(v)}</li>)}
                   </ul>
                 </>
               )}

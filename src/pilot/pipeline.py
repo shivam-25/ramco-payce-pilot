@@ -357,6 +357,8 @@ def run_ticket(raw: dict, *, as_of: date | None = None,
                          on_event=on_event)
         if d.usage:
             meter.add(d.usage)
+        for u in d.extra_usage:
+            meter.add(u)
         t["answer"] = (clock() - t0) * 1000
 
         if d.escalate or not d.grounded:

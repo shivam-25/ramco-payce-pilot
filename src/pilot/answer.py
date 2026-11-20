@@ -22,6 +22,8 @@ from datetime import date
 from .bedrock import converse, converse_stream, Usage
 from .config import DRAFT_MODEL, TOP_K
 from .chunking import STUB_MARKER
+from .language import (NAMES, detect as detect_language, to_english,
+                        reply_instruction, split_bilingual)
 from .retrieval import Hit, retrieve
 
 # The floor below which retrieval has returned nothing at all and the model
@@ -105,6 +107,20 @@ class Draft:
     escalate: bool = False
     reason: str = ""
     usage: Usage | None = None
+    # Calls made before the draft that still cost money -- today that is the
+    # one translation on a non-English ticket. Kept separate from `usage`
+    # because the pipeline's meter prices each call against its own model,
+    # and folding a nova-micro translation into a nova-pro draft would
+    # quietly price it wrong.
+    extra_usage: list[Usage] = field(default_factory=list)
+    # 'en', 'ar' or 'hi' -- the language the customer wrote in, which is the
+    # language `text` is written in.
+    language: str = "en"
+    # The English half of a bilingual draft, for the agent who approves it.
+    # Equal to `text` for an English ticket; empty when a non-English draft
+    # came back without the separator, which is a format failure worth
+    # seeing rather than hiding.
+    english: str = ""
 
     @property
     def grounded(self) -> bool:
@@ -130,8 +146,18 @@ def answer(conn, question: str, *, region: str, as_of: date,
         if on_event is not None:
             on_event({"event": event, **kw})
 
+    # The corpus is English. A question in another script is embedded
+    # against it and retrieves something plausible but wrong, so the search
+    # term is translated first while the customer's own words are kept for
+    # the draft. English questions take the same path they always did and
+    # pay nothing extra: to_english returns them untouched.
+    lang = detect_language(question)
+    search_text, lang_usage = to_english(question, lang)
+    emit("stage", box="language", ms=None,
+         note=NAMES[lang] + (" translated for search" if lang != "en" else ""))
+
     hits, embed_usage = retrieve(conn, chunk_strategy, retrieval_strategy,
-                                 question, k=k, region=region, as_of=as_of)
+                                 search_text, k=k, region=region, as_of=as_of)
     emit("stage", box="retrieve", ms=None,
          note=f"{len(hits)} passages" if hits else "nothing matched")
 
@@ -167,7 +193,8 @@ def answer(conn, question: str, *, region: str, as_of: date,
 
     prompt = (f"Question date: {as_of}\nCustomer region: {region}\n\n"
               f"Passages:\n{_format(hits, as_of)}\n\n"
-              f"Support question:\n{question}")
+              f"Support question:\n{question}"
+              + reply_instruction(lang))
     # Streaming and buffered differ only in how the same string arrives.
     # When nobody is watching there is no reason to pay for the extra
     # event plumbing, so the buffered call stays the default.
@@ -202,7 +229,8 @@ def answer(conn, question: str, *, region: str, as_of: date,
         why = re.sub(r"\bESCALATE\b", "", text, flags=re.I)
         why = re.sub(r"\s+", " ", why).strip(" .")
         return Draft(text="", citations=[], passages=hits, escalate=True,
-                     usage=usage,
+                     usage=usage, language=lang,
+                     extra_usage=[u for u in (lang_usage,) if u],
                      reason=f"model escalated: {why[:240]}" if why
                             else "model escalated")
 
@@ -210,5 +238,8 @@ def answer(conn, question: str, *, region: str, as_of: date,
     citations = [hits[int(c) - 1].source_id for c in cited
                  if 0 < int(c) <= len(hits)]
 
-    return Draft(text=text.strip(), citations=citations, passages=hits,
-                 escalate=False, usage=usage, reason="")
+    customer_half, english_half = split_bilingual(text.strip(), lang)
+    return Draft(text=customer_half, citations=citations, passages=hits,
+                 escalate=False, usage=usage, reason="",
+                 extra_usage=[u for u in (lang_usage,) if u],
+                 language=lang, english=english_half)
