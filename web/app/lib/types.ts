@@ -78,6 +78,25 @@ function plainReason(reason: string): string {
     return "A reply was drafted but nothing supported it, so it was held back.";
   if (r.includes("customer not found"))
     return "That customer is not in the pilot's records.";
+  // "model escalated: The passages do not provide information on how to
+  // export last year's YTD figures" -- the tail of that is the single most
+  // useful sentence on the screen for whoever picks the ticket up, because
+  // it says exactly what was missing. Showing the generic line instead threw
+  // it away. Strip the pipeline's prefix and the "passages" vocabulary, and
+  // hand the rest over.
+  const said = /^model escalated:\s*(.+)$/is.exec(reason || "");
+  if (said) {
+    const why = said[1].trim()
+      .replace(/^the (?:retrieved )?passages? (?:do|does) not (?:provide|contain) (?:any )?(?:information|details?) (?:on|about|regarding)\s*/i,
+               "Nothing on file covers ")
+      .replace(/^the (?:retrieved )?passages? (?:do|does) not (?:cover|mention|address)\s*/i,
+               "Nothing on file covers ")
+      .replace(/\bis not covered by the (?:retrieved )?passages?\b/i,
+               "is not covered by anything on file")
+      .replace(/\bthe (?:retrieved )?passages?\b/gi, "the rules on file");
+    return why.charAt(0).toUpperCase() + why.slice(1) +
+           (/[.!?]$/.test(why) ? "" : ".");
+  }
   if (r.includes("escalat"))
     return "The rules retrieved do not cover this question, so nothing was drafted.";
   return reason || "A person should handle this one.";

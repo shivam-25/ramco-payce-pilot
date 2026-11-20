@@ -5,6 +5,24 @@ import { TICKETS, BURST, type Demo } from "./lib/demo";
 import { status, withMarkers, period, pretty, pool, readable, heading, neutralise,
          score, stale, type Row, type Result, type Source } from "./lib/types";
 
+// What to call each identifier in front of an agent. "AADHAAR" is how the
+// gate reports it; "Aadhaar number" is what a person says.
+const PII_NAMES: Record<string, [string, string]> = {
+  AADHAAR: ["Aadhaar number", "Aadhaar numbers"],
+  PAN: ["PAN", "PANs"],
+  IBAN: ["bank account number", "bank account numbers"],
+  EMAIL: ["email address", "email addresses"],
+  PHONE: ["phone number", "phone numbers"],
+  EMIRATES_ID: ["Emirates ID", "Emirates IDs"],
+};
+
+function piiName(key: string, n: number): string {
+  const pair = PII_NAMES[key.toUpperCase()];
+  if (pair) return n > 1 ? pair[1] : pair[0];
+  const plain = key.toLowerCase().replace(/_/g, " ");
+  return n > 1 ? `${plain}s` : plain;
+}
+
 const mk = (d: Demo): Row => ({
   key: d.id, subject: d.subject, body: d.body, customer: d.customer,
   asOf: d.asOf, note: d.note, dated: d.dated, state: "idle",
@@ -130,18 +148,18 @@ export default function Console() {
 
       {board && (
         <dl className="board">
-          <div><dt>Replies carrying a citation</dt>
+          <div><dt>Replies backed by a source</dt>
                <dd className={board.cited === "100%" ? "good" : ""}>{board.cited}</dd>
-               <dfn>target 100%, from 48% today</dfn></div>
-          <div><dt>Citations from the wrong period</dt>
+               <dfn>every answer shows where it came from &mdash; 48% do today</dfn></div>
+          <div><dt>Answers using an out-of-date rule</dt>
                <dd className={board.stale === "0" ? "good" : "bad"}>{board.stale}</dd>
-               <dfn>target 0, from 48 a quarter</dfn></div>
+               <dfn>none so far &mdash; this happened 48 times last quarter</dfn></div>
           <div><dt>Cost per ticket</dt>
                <dd className="good">{board.cost}</dd>
-               <dfn>cap $4.50, from $6.16</dfn></div>
-          <div><dt>Answered without a person</dt>
+               <dfn>what the desk spends today is $6.16</dfn></div>
+          <div><dt>Handled without you</dt>
                <dd>{board.alone}</dd>
-               <dfn>the rest route with a reason</dfn></div>
+               <dfn>the rest come to you, with the reason</dfn></div>
         </dl>
       )}
 
@@ -292,8 +310,9 @@ function Reply({ row, acted, onAct, onCompare }: {
 
       {pii.length > 0 && (
         <p className="pii">
-          Removed before the assistant read it: {pii.map(([k, v]) =>
-            `${v} ${k.toLowerCase()}${v > 1 ? "s" : ""}`).join(", ")}.
+          Personal details were hidden before this was drafted: {pii.map(([k, v]) =>
+            `${v} ${piiName(k, v)}`).join(", ")}. The customer still sees them
+          on the ticket; the draft was written without them.
         </p>
       )}
 
@@ -301,8 +320,8 @@ function Reply({ row, acted, onAct, onCompare }: {
         {acted ? (
           <p className="acted">
             {acted === "send"
-              ? "Approved. In the pilot nothing actually leaves the building."
-              : "Passed to a person, with the reason attached."}
+              ? "Approved. This is a pilot, so nothing was actually sent."
+              : "Sent to a colleague, with the reason attached."}
           </p>
         ) : (
           <>
