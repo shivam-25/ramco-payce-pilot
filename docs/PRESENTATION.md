@@ -1,7 +1,7 @@
 # Live presentation prep — 15 minutes
 
 Brief's order: **the database, the data, the pilot, the evals, then the cost.**
-The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 15 slides.
+The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 16 slides.
 
 ---
 
@@ -14,7 +14,7 @@ The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 15 slides.
 | 2:00–3:30 | 3 Pipeline | Ten boxes, each can refuse. **"Rules in code, judgement in the model."** PII, injection, money and dates are decided by code you can test; only drafting is a model. | Don't walk through all ten. Name the principle, point at the strip. |
 | 3:30–5:00 | 4–5 Chunking + retrieval | Chosen by bake-off, not assumption: 4 × 4 strategies, scored with set arithmetic, **no model judge, so the measurement can't flatter itself.** Then the punchline: plain hybrid beat the winner on MRR *and got 3 of 5 dated questions wrong.* The winner is not the top row. | Your strongest methodology moment. Don't rush it. |
 | 5:00–7:30 | 6 Gates | The heart. Eight pass, two don't. Walk G1 → G8, pausing on the two failures. | Don't defend the failures yet — say "I'll come back to both". |
-| 7:30–10:30 | **LIVE DEMO** (or slides 7–11) | Four runs, below. | See risks. |
+| 7:30–10:30 | **LIVE DEMO** (or slides 7–11b) | Four runs, below. Slide 11b is a ticket typed live, if you skip the demo. | See risks. |
 | 10:30–12:00 | 12 + 12b | Six defects, all mine, four found by a test the code had just passed. Then: two things tried after the gates were green — one worked, one lost. | The trained-router 100% story is your best anecdote. Tell it. |
 | 12:00–13:30 | 13 Cost | USD 6.03 → USD 87/month. **97% of the bill is always-on infrastructure; the models are USD 1.29 of USD 87.** | Don't let them think models are the cost. This surprises people. |
 | 13:30–15:00 | 14 Ledger | What's shipped, what's open, why. End on: answers what it can, refuses out loud, never moves money. | Don't end on an apology either. |
@@ -53,7 +53,7 @@ A good one to invite: *any payroll question with an ID in it*. The reply carries
 **Risks and what to do:**
 - **Use `C-1001` (India) or `C-1003` (UAE).** An id not on file is handed to a person — correct behaviour, but it fires the *unknown customer* rule instead of whichever rule you meant to show.
 - **Warm it first.** Run one throwaway draft ~2 minutes before you start. A cold AgentCore session costs about 5 s; after that it's under 2 s.
-- **If it dies, slides 7–11 are the same scenarios as screenshots.** Switch without comment. Say "I have these captured" — not "sorry, it's broken".
+- **If it dies, slides 7–11b are the same scenarios as screenshots.** Switch without comment. Say "I have these captured" — not "sorry, it's broken".
 - **Don't submit an empty ticket body.** It currently returns a 502 from upstream rather than a clean 400. Minor, real, unfixed.
 
 ---
