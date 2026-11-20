@@ -307,3 +307,11 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .pri.P2 { color: var(--warn, #F2B134);
           border: 1px solid color-mix(in srgb, var(--warn, #F2B134) 45%, transparent); }
 .pri.P4 { color: var(--dim); border: 1px solid var(--line); }
+
+/* The footer is sticky, so it must never grow past what the viewport can
+   spare -- an impact panel that covers the reply is worse than no panel. */
+.scorebar { max-height: 72vh; overflow-y: auto; }
+.impact { font-size: 11.5px; padding: 2px 9px; border-radius: 999px;
+          color: var(--dim); background: transparent;
+          border: 1px solid var(--line); cursor: pointer; }
+.impact:hover { color: var(--fg); border-color: var(--line2); }

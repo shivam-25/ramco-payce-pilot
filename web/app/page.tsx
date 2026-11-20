@@ -61,6 +61,10 @@ export default function Console() {
   const [filter, setFilter] = useState<Bucket | "all">("all");
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<Sort>("arrival");
+  // Collapsed by default. The charts are worth a lot on a projector and the
+  // footer is sticky, so left open they cover the reply you are reading --
+  // which is the one thing that must always be visible.
+  const [charts, setCharts] = useState(false);
   const filterRef = useRef<Bucket | "all">("all");
   const queryRef = useRef("");
   useEffect(() => { filterRef.current = filter; }, [filter]);
@@ -383,15 +387,18 @@ export default function Console() {
           {/* The counts are the filter. Reading "27 to you" and having no way
               to see those 27 is the kind of dead end that makes a dashboard
               feel like a poster. */}
-          <div className="charts">
+          {charts && <div className="charts">
             <Saved rows={rows} />
             <Gauge pct={parseFloat(board.alone)} label="Handled without you"
                    sub={`${board.drafted} of ${board.seen} needed nobody`} />
             <Split s={board} />
             <Speed rows={rows} />
-          </div>
+          </div>}
 
           <div className="tallies">
+            <button className="impact" onClick={() => setCharts((c) => !c)}>
+              {charts ? "Hide impact" : "Show impact"}
+            </button>
             <button onClick={() => setFilter("all")}><b>{board.seen}</b> handled</button>
             <button className="ok" onClick={() => setFilter("ready")}>
               <b>{board.drafted}</b> drafted</button>
