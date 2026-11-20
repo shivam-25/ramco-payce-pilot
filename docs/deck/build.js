@@ -11,8 +11,11 @@ const fs = require('fs');
   const files = fs.readdirSync('slides').filter(f => f.endsWith('.html')).sort();
   for (const f of files) {
     process.stdout.write(`  ${f} ... `);
-    await html2pptx(`slides/${f}`, pptx);
-    console.log('ok');
+    const { slide } = await html2pptx(`slides/${f}`, pptx);
+    const html = fs.readFileSync(`slides/${f}`, 'utf8');
+    const m = html.match(/<!--NOTES([\s\S]*?)-->/);
+    if (m) slide.addNotes(m[1].trim());
+    console.log(m ? 'ok + notes' : 'ok');
   }
   await pptx.writeFile({ fileName: 'ramco-payce-pilot.pptx' });
   console.log(`\nwrote ramco-payce-pilot.pptx (${files.length} slides)`);

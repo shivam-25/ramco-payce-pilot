@@ -1,0 +1,43 @@
+<!DOCTYPE html><html><head><style>
+html{background:#0B0E14;}
+body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
+.slide{margin:0;padding:34pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.wrap{display:flex;flex-direction:column;justify-content:center;height:337pt;}
+.kicker{color:#E8336D;font-size:10pt;margin:0 0 14pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:48pt;margin:0 0 8pt 0;letter-spacing:-1.2pt;}
+.url{color:#3ECF8E;font-size:13pt;margin:0 0 26pt 0;font-family:'Courier New',monospace;}
+.row{display:flex;gap:13pt;}
+.card{background:#141922;border:1px solid #242C3A;border-radius:6pt;padding:12pt 13pt;width:151pt;box-sizing:border-box;}
+.n{color:#E8336D;font-size:10pt;margin:0 0 5pt 0;font-family:'Courier New',monospace;font-weight:bold;}
+.t{color:#E6E9EF;font-size:11.5pt;font-weight:bold;margin:0 0 4pt 0;line-height:1.25;}
+.d{color:#8B95A7;font-size:9.5pt;margin:0;line-height:1.35;}
+.foot{color:#8B95A7;font-size:10.5pt;margin:22pt 0 0 0;}
+</style></head><body><div class="slide"><div class="wrap">
+<p class="kicker">LIVE &nbsp;·&nbsp; FOUR THINGS TO WATCH</p>
+<h1>Demo</h1>
+<p class="url">ramco-payce-pilot.vercel.app</p>
+<div class="row">
+  <div class="card"><p class="n">01</p><p class="t">The same question,<br>two months</p><p class="d">June returns 15,000. September returns 25,000. Both cited.</p></div>
+  <div class="card"><p class="n">02</p><p class="t">An injection,<br>refused for free</p><p class="d">A real one, from their export. No model ever reads it.</p></div>
+  <div class="card"><p class="n">03</p><p class="t">Money, handed<br>to a person</p><p class="d">It could have written something. It is not allowed to.</p></div>
+  <div class="card"><p class="n">04</p><p class="t">A queue that<br>never goes quiet</p><p class="d">Live feed, filters, and what it gives the desk back.</p></div>
+</div>
+<p class="foot">If the demo fails, the appendix carries all four scenarios captured from production.</p>
+</div></div></body></html>
+<!--NOTES
+DO THIS BEFORE YOU PRESENT: open the console and draft one reply, two minutes
+ahead. Cold start is ~5s, warm is 2.5s, and a cold demo ruins the latency story.
+
+Order: June -> compare September -> injection -> money -> feed -> impact.
+Full beat-by-beat script is in the Demo Runbook doc.
+
+While the first one runs, narrate the boxes: "those aren't a progress bar --
+that's the pipeline reporting its own stages over a WebSocket, with the real
+time each one took."
+
+Don't leave the live feed running while you talk: it costs money and it keeps
+changing the numbers you're about to point at. Ten seconds, then stop it.
+
+If the socket won't open it falls back silently to the buffered endpoint --
+answers still arrive, boxes just don't light up. Say nothing unless asked.
+-->

@@ -2,30 +2,33 @@
 body { width:720pt; height:405pt; margin:0; padding:0; background:#0B0E14;
        font-family:Arial, Helvetica, sans-serif; display:flex; }
 .slide { margin:0; padding:34pt 40pt; width:720pt; height:405pt; box-sizing:border-box; }
-h1 { color:#E6E9EF; font-size:30pt; margin:0 0 6pt 0; letter-spacing:-0.4pt; }
-h2 { color:#E6E9EF; font-size:21pt; margin:0 0 4pt 0; letter-spacing:-0.3pt; }
-.kicker { color:#E8336D; font-size:10pt; margin:0 0 9pt 0; font-weight:bold;
+.kicker { color:#E8336D; font-size:10pt; margin:0 0 10pt 0; font-weight:bold;
           letter-spacing:1.6pt; font-family:'Courier New', monospace; }
-.sub { color:#8B95A7; font-size:11.5pt; margin:0 0 14pt 0; line-height:1.4; }
-.body { color:#C6CCD8; font-size:11.5pt; margin:0 0 7pt 0; line-height:1.45; }
-.small { color:#8B95A7; font-size:9.5pt; margin:0; line-height:1.35; }
 .mono { font-family:'Courier New', monospace; }
-.card { background:#141922; border:1px solid #242C3A; border-radius:7pt; padding:13pt; }
-.num { color:#E8336D; font-size:30pt; margin:0; font-family:'Courier New', monospace; font-weight:bold; }
-.numlabel { color:#8B95A7; font-size:9pt; margin:3pt 0 0 0; line-height:1.3; }
 .ok { color:#3ECF8E; }
-.warn { color:#F2B134; }
 .accent { color:#E8336D; }
-.row { display:flex; gap:12pt; }
 
 .wrap{display:flex;flex-direction:column;justify-content:center;height:337pt;}
-.bar{background:#E8336D;width:54pt;height:4pt;margin:0 0 20pt 0;border-radius:2pt;}
-h1{font-size:40pt;margin:0 0 10pt 0;}
+.bar{background:#E8336D;width:54pt;height:4pt;margin:0 0 18pt 0;border-radius:2pt;}
+h1{color:#E6E9EF;font-size:46pt;line-height:1.04;margin:0 0 14pt 0;letter-spacing:-1.2pt;}
+h1 span{color:#8B95A7;font-weight:normal;}
+.lead{color:#C6CCD8;font-size:14pt;margin:0 0 22pt 0;line-height:1.4;width:530pt;}
+.row{display:flex;gap:13pt;margin:0 0 20pt 0;}
+.card{background:#141922;border:1px solid #242C3A;border-left:3pt solid #3ECF8E;
+      border-radius:6pt;padding:11pt 13pt;width:198pt;box-sizing:border-box;}
+.num{font-size:23pt;margin:0;font-family:'Courier New',monospace;font-weight:bold;color:#3ECF8E;}
+.vs{color:#8B95A7;font-size:9pt;margin:4pt 0 0 0;line-height:1.35;}
+.foot{color:#8B95A7;font-size:9.5pt;margin:0;line-height:1.5;}
 </style></head><body><div class="slide"><div class="wrap">
 <div class="bar"></div>
-<p class="kicker">RAMCO PAYCE — SUPPORT TRIAGE PILOT</p>
-<h1>Answer the easy half.<br>Hand a person the rest,<br>with the reason written down.</h1>
-<p class="sub" style="margin-top:14pt;width:470pt;">A six-week pilot, built and measured against the real ticket export.
-Eight gates with numbers. Two of them fail, and those are the most useful slides in here.</p>
-<p class="small mono">Bedrock AgentCore in a VPC &nbsp;·&nbsp; Postgres + pgvector, one database per region &nbsp;·&nbsp; ap-southeast-2</p>
+<p class="kicker">FDE ACCELERATOR &nbsp;·&nbsp; BUILD, TEST AND COST THE PILOT</p>
+<h1>Ramco Payce<br><span>Support triage pilot</span></h1>
+<p class="lead">Answer the easy half. Hand a person the rest, with the reason written down.</p>
+<div class="row">
+  <div class="card"><p class="num">$0.00050</p><p class="vs">per drafted reply<br>the desk spends <span class="mono">$6.03</span> a ticket today</p></div>
+  <div class="card"><p class="num">2.51s</p><p class="vs">p95 to a first reply<br>the vendor bot took <span class="mono">19s</span></p></div>
+  <div class="card"><p class="num">100%</p><p class="vs">of replies carry a source<br>today only <span class="mono">48%</span> do</p></div>
+</div>
+<p class="foot">Shivam &nbsp;·&nbsp; 20 November 2026 &nbsp;·&nbsp; live at <span class="mono">ramco-payce-pilot.vercel.app</span><br>
+<span class="mono">Bedrock AgentCore in a VPC &nbsp;·&nbsp; Postgres + pgvector, one database per region &nbsp;·&nbsp; ap-southeast-2</span></p>
 </div></div></body></html>

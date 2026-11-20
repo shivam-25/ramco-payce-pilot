@@ -1,7 +1,8 @@
 # Live presentation prep — 15 minutes
 
 Brief's order: **the database, the data, the pilot, the evals, then the cost.**
-The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 17 slides.
+The deck follows it. Deck: `docs/ramco-payce-pilot.pptx` — **12 narrative slides, then an appendix of 16.**
+Every narrative slide carries speaker notes in the pptx; open the presenter view and they are there.
 
 ---
 
@@ -14,7 +15,7 @@ The deck follows it. Deck: `docs/ramco-payce-pilot.pptx`, 17 slides.
 | 2:00–3:30 | 3 Pipeline | Ten boxes, each can refuse. **"Rules in code, judgement in the model."** PII, injection, money and dates are decided by code you can test; only drafting is a model. | Don't walk through all ten. Name the principle, point at the strip. |
 | 3:30–5:00 | 4–5 Chunking + retrieval | Chosen by bake-off, not assumption: 4 × 4 strategies, scored with set arithmetic, **no model judge, so the measurement can't flatter itself.** Then the punchline: plain hybrid beat the winner on MRR *and got 3 of 5 dated questions wrong.* The winner is not the top row. | Your strongest methodology moment. Don't rush it. |
 | 5:00–7:30 | 6 Gates | The heart. Eight pass, two don't. Walk G1 → G8, pausing on the two failures. | Don't defend the failures yet — say "I'll come back to both". |
-| 7:30–10:30 | **LIVE DEMO** (or slides 7–11c) | Four runs, below. Slide 11b is a ticket typed live; 11c is the console streaming, with the impact tiles. | See risks. |
+| 7:30–10:30 | **LIVE DEMO** (slide 6 is the divider) | Four runs, below. If it dies, the appendix carries all four captured from production. | See risks. |
 | 10:30–12:00 | 12 + 12b | Six defects, all mine, four found by a test the code had just passed. Then: two things tried after the gates were green — one worked, one lost. | The trained-router 100% story is your best anecdote. Tell it. |
 | 12:00–13:30 | 13 Cost | USD 6.03 → USD 87/month. **97% of the bill is always-on infrastructure; the models are USD 1.29 of USD 87.** | Don't let them think models are the cost. This surprises people. |
 | 13:30–15:00 | 14 Ledger | What's shipped, what's open, why. End on: answers what it can, refuses out loud, never moves money. | Don't end on an apology either. |
@@ -53,7 +54,7 @@ A good one to invite: *any payroll question with an ID in it*. The reply carries
 **Risks and what to do:**
 - **Use `C-1001` (India) or `C-1003` (UAE).** An id not on file is handed to a person — correct behaviour, but it fires the *unknown customer* rule instead of whichever rule you meant to show.
 - **Warm it first.** Run one throwaway draft ~2 minutes before you start. A cold AgentCore session costs about 5 s; after that it's under 2 s.
-- **If it dies, slides 7–11c are the same scenarios as screenshots.** Switch without comment. Say "I have these captured" — not "sorry, it's broken".
+- **If it dies, the appendix slides are the same scenarios as screenshots.** Switch without comment. Say "I have these captured" — not "sorry, it's broken".
 - **Don't submit an empty ticket body.** It currently returns a 502 from upstream rather than a clean 400. Minor, real, unfixed.
 
 ---
@@ -204,3 +205,35 @@ The time figure is derived, not assumed — 42 FTE against 15,000 tickets is
 If the socket cannot open, the console silently falls back to the buffered
 endpoint. Answers still arrive; the boxes just do not light up. Nothing to
 announce unless someone noticed.
+
+
+---
+
+## Slide order (rebuilt 20 Nov as a presentation, not a document)
+
+The deck was restructured: one idea per slide, detail moved into speaker
+notes, and every technical slide kept as an appendix rather than deleted.
+
+| # | Slide | The one thing it does |
+|---|---|---|
+| 1 | Title | Name, one-line positioning, three proof numbers |
+| 2 | 15,000 → 25,000 | The incident. Open here and do not rush it |
+| 3 | What the desk costs | $6.03 · 48% cite a source · 48 stale-rule uses |
+| 4 | **Rules in code, judgement in the model** | The one design decision the talk hangs on |
+| 5 | The pipeline | Nine stages, two of them models |
+| 6 | **Demo** | Divider + the four things to watch |
+| 7 | Nine gates, eight pass | Four headline numbers |
+| 8 | The two that fail | G2 90%, G5 0.789 — measurement problems |
+| 9 | 51.7% → 25.0% | The number corrected in public |
+| 10 | Economics | 97% infra; doubling volume costs ~$1 |
+| 11 | What I'd do next | Four items; the first is not engineering |
+| 12 | Appendix divider | Skip unless asked |
+
+Appendix (13–28): the problem counted, the nine stages in full, chunking and
+retrieval bake-offs, all ten gate numbers with intervals, the six defects
+measurement found, the two things that did not work, cost line by line, and
+the captured demo scenarios.
+
+**Speaker notes are in the file.** They carry the delivery — where to pause,
+the lines worth saying verbatim, and the answers to the pushback each slide
+invites. The slides deliberately do not repeat them.
