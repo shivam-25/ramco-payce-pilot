@@ -294,11 +294,16 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
    Uniform rows and one fixed visual height make that impossible. */
 .charts { display: grid; gap: 10px; margin-bottom: 12px;
           grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 1000px) { .charts { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .charts { grid-template-columns: 1fr; } }
+/* Four across for as long as they fit. Two rows of two is twice as tall,
+   and on a 760px-high laptop that is the difference between the queue
+   having room and the queue having two rows -- the panel then crowds out
+   the thing it is describing. The titles ellipsize rather than wrap, so
+   narrow columns cost a word, not a line. */
+@media (max-width: 760px) { .charts { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 430px) { .charts { grid-template-columns: 1fr; } }
 
 .tile { margin: 0; min-width: 0; display: flex; flex-direction: column;
-        gap: 6px; padding: 9px 11px 10px; border-radius: 8px;
+        gap: 5px; padding: 8px 10px 9px; border-radius: 8px;
         background: var(--card); border: 1px solid var(--line); }
 .t-top { display: flex; align-items: baseline; justify-content: space-between;
          gap: 8px; min-width: 0; }
@@ -307,7 +312,7 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .t-value { font-family: var(--mono); font-size: 15px; font-weight: 600;
            color: var(--fg); flex: 0 0 auto; }
 /* One height for every visual, so the notes under them share a baseline. */
-.t-vis { height: 40px; display: flex; align-items: flex-end; }
+.t-vis { height: 34px; display: flex; align-items: flex-end; }
 .t-vis svg { width: 100%; height: 100%; display: block; }
 .t-note { margin: 0; font-size: 10px; line-height: 1.3; color: var(--dim);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
