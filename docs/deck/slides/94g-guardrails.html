@@ -1,47 +1,49 @@
 <!DOCTYPE html><html><head><style>
 html{background:#0B0E14;}
 body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
-.slide{margin:0;padding:28pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
-.kicker{color:#E8336D;font-size:10pt;margin:0 0 6pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
-h1{color:#E6E9EF;font-size:24pt;margin:0 0 3pt 0;letter-spacing:-0.5pt;}
-.sub{color:#8B95A7;font-size:10pt;margin:0 0 13pt 0;line-height:1.4;}
+.slide{margin:0;padding:26pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:9pt;margin:0 0 5pt 0;font-weight:bold;letter-spacing:1.5pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:22pt;margin:0 0 3pt 0;letter-spacing:-0.5pt;}
+.sub{color:#8B95A7;font-size:9pt;margin:0 0 11pt 0;line-height:1.4;}
 .mono{font-family:'Courier New',monospace;}
-table{border-collapse:collapse;width:640pt;margin:0 0 11pt 0;}
-th{color:#8B95A7;font-size:7.5pt;text-align:left;padding:0 6pt 4pt 0;font-family:'Courier New',monospace;font-weight:normal;letter-spacing:0.4pt;}
-td{color:#C6CCD8;font-size:8.5pt;padding:3.5pt 6pt 3.5pt 0;border-top:1px solid #1D242F;line-height:1.25;}
-td.m{font-family:'Courier New',monospace;}
-td.ok{color:#3ECF8E;font-family:'Courier New',monospace;font-weight:bold;}
-td.bad{color:#E8336D;font-family:'Courier New',monospace;font-weight:bold;}
-.two{display:flex;gap:16pt;}
-.col{width:312pt;}
-.ct{color:#E6E9EF;font-size:10pt;font-weight:bold;margin:0 0 5pt 0;}
-.note{color:#8B95A7;font-size:9pt;margin:0;line-height:1.45;}
+.row{display:flex;width:640pt;border-top:1px solid #1D242F;padding:3.5pt 0 3.5pt 0;}
+.hrow{display:flex;width:640pt;padding:0 0 3pt 0;}
+.hrow p{color:#8B95A7;font-size:7pt;font-family:'Courier New',monospace;letter-spacing:0.4pt;margin:0;}
+.row p{margin:0;font-size:8pt;color:#C6CCD8;line-height:1.2;}
+.d1{width:160pt;}.d2{width:250pt;}.d3{width:150pt;}.d4{width:80pt;}
+.m{font-family:'Courier New',monospace;}
+.block{color:#E8336D;font-family:'Courier New',monospace;font-weight:bold;}
+.anon{color:#3ECF8E;font-family:'Courier New',monospace;font-weight:bold;}
+.two{display:flex;gap:18pt;margin-top:12pt;}
+.col{width:311pt;}
+.ct{color:#E6E9EF;font-size:9.5pt;font-weight:bold;margin:0 0 5pt 0;}
+.note{color:#8B95A7;font-size:8.5pt;margin:0;line-height:1.45;}
 .note b{color:#E6E9EF;font-weight:normal;}
+.e1{width:150pt;}.e2{width:70pt;}.e3{width:91pt;}
+.bad{color:#E8336D;font-family:'Courier New',monospace;font-weight:bold;}
 </style></head><body><div class="slide">
 <p class="kicker">APPENDIX &nbsp;·&nbsp; DEFENCE IN DEPTH</p>
 <h1>Regex is complete over what it enumerates, blind to what it cannot.</h1>
 <p class="sub">Both limits were written in the source before they were fixed. <span class="mono">pii.py</span>: &ldquo;Names are not regex-detectable in general.&rdquo; &nbsp;<span class="mono">injection.py</span>: &ldquo;a screen alone is a filter and filters can be walked around.&rdquo;</p>
-<table>
-<tr><th>POLICY</th><th>CONFIG</th><th>DETECTOR</th><th>ACTION</th></tr>
-<tr><td class="m">contentPolicyConfig</td><td class="m">PROMPT_ATTACK, inputStrength HIGH</td><td>managed jailbreak classifier</td><td class="bad">BLOCK</td></tr>
-<tr><td class="m">piiEntitiesConfig</td><td class="m">NAME, ADDRESS, EMAIL, PHONE, AGE, IBAN&hellip;</td><td>managed NER</td><td class="ok">ANONYMIZE</td></tr>
-<tr><td class="m">piiEntitiesConfig</td><td class="m">PASSWORD, CREDIT_DEBIT_CARD_NUMBER</td><td>managed NER</td><td class="bad">BLOCK</td></tr>
-<tr><td class="m">regexesConfig</td><td class="m">AADHAAR, PAN, EMIRATES_ID, UAN</td><td>custom &mdash; no built-in type exists</td><td class="ok">ANONYMIZE</td></tr>
-</table>
+
+<div class="hrow"><p class="d1">POLICY</p><p class="d2">CONFIG</p><p class="d3">DETECTOR</p><p class="d4">ACTION</p></div>
+<div class="row"><p class="d1 m">contentPolicyConfig</p><p class="d2 m">PROMPT_ATTACK, inputStrength HIGH</p><p class="d3">managed jailbreak classifier</p><p class="d4 block">BLOCK</p></div>
+<div class="row"><p class="d1 m">piiEntitiesConfig</p><p class="d2 m">NAME, ADDRESS, EMAIL, PHONE, IBAN&hellip;</p><p class="d3">managed NER</p><p class="d4 anon">ANONYMIZE</p></div>
+<div class="row"><p class="d1 m">piiEntitiesConfig</p><p class="d2 m">PASSWORD, CREDIT_DEBIT_CARD_NUMBER</p><p class="d3">managed NER</p><p class="d4 block">BLOCK</p></div>
+<div class="row"><p class="d1 m">regexesConfig</p><p class="d2 m">AADHAAR, PAN, EMIRATES_ID, UAN</p><p class="d3">custom &mdash; no built-in type</p><p class="d4 anon">ANONYMIZE</p></div>
+
 <div class="two">
 <div class="col">
-  <p class="ct">Measured, warm</p>
-  <table style="width:312pt;">
-  <tr><th>CASE</th><th>REGEX</th><th>+ GUARDRAILS</th></tr>
-  <tr><td>Paraphrased injection</td><td class="bad">missed</td><td class="ok">BLOCKED</td></tr>
-  <tr><td>Off-roster name + address</td><td class="bad">clean</td><td class="ok">NAME, ADDRESS</td></tr>
-  </table>
-  <p class="note" style="margin-top:8pt;"><b>Order:</b> regex first and free &mdash; <span class="mono">ApplyGuardrail</span> only sees what regex cleared, so a hostile ticket still costs nothing. <b>Fail closed:</b> unreachable &rarr; a person.</p>
+  <p class="ct">Measured on the deployed pilot</p>
+  <div class="hrow" style="width:311pt;"><p class="e1">CASE</p><p class="e2">REGEX</p><p class="e3">+ GUARDRAILS</p></div>
+  <div class="row" style="width:311pt;"><p class="e1">Paraphrased injection</p><p class="e2 bad">missed</p><p class="e3 anon">BLOCKED</p></div>
+  <div class="row" style="width:311pt;"><p class="e1">Off-roster name + address</p><p class="e2 bad">clean</p><p class="e3 anon">NAME, ADDRESS</p></div>
+  <p class="note" style="margin-top:7pt;"><b>Order:</b> regex first and free &mdash; <span class="mono">ApplyGuardrail</span> only sees what regex cleared. <b>Fail closed:</b> unreachable &rarr; a person. ~320 ms added.</p>
 </div>
 <div class="col">
   <p class="ct">It is not the security boundary</p>
-  <p class="note">The boundary is the <b>absence of capability</b>: no tool binding on the drafting model, read-only database role, and a forbidden set &mdash; <span class="mono">approve_refund</span>, <span class="mono">issue_payment</span>, <span class="mono">list_admin_emails</span>, <span class="mono">send_to_customer</span> &mdash; asserted unreachable from the drafting path by <b>G4</b>.</p>
-  <p class="note" style="margin-top:8pt;">A probabilistic filter in front of a system that cannot act is defence in depth. In front of one that <i>can</i> act it would be a single point of failure wearing a safety label.</p>
+  <p class="note">The boundary is the <b>absence of capability</b>: no tool binding on the drafting model, a read-only database role, and a forbidden set &mdash; <span class="mono">approve_refund</span>, <span class="mono">issue_payment</span>, <span class="mono">list_admin_emails</span>, <span class="mono">send_to_customer</span> &mdash; asserted unreachable from the drafting path by <b>G4</b>.</p>
+  <p class="note" style="margin-top:7pt;">A probabilistic filter in front of a system that cannot act is defence in depth. In front of one that <i>can</i> act it would be a single point of failure wearing a safety label.</p>
 </div>
 </div>
 </div></body></html>
@@ -58,11 +60,13 @@ address -- unbounded, not enumerable), custom regex handles the BOUNDED
 national identifiers Bedrock has no built-in type for (Aadhaar, PAN,
 Emirates ID, UAN). Neither subsumes the other.
 
-One implementation detail worth knowing: ApplyGuardrail with source=INPUT
-returns output:null even when it reports ANONYMIZED -- it returns the matched
-span instead. So masking is applied locally from those spans into the same
-[REDACTED:TYPE] placeholder the regex gate uses. The spans are PII and never
-reach a log or an audit row.
+Two details worth knowing. ApplyGuardrail with source=INPUT returns
+output:null even when it reports ANONYMIZED -- it returns the matched span
+instead, so masking is applied locally into the same [REDACTED:TYPE]
+placeholder the regex gate uses. Those spans are PII and never reach a log
+or an audit row. And the IAM permission was missing on the first deploy:
+every call returned AccessDenied, and the fail-closed branch routed those
+tickets to a person. The design caught its own broken deploy.
 
 Close on the boundary argument. This does not make the filter load-bearing.
 -->

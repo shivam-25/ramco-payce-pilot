@@ -1,74 +1,62 @@
 <!DOCTYPE html><html><head><style>
 html{background:#0B0E14;}
 body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
-.slide{margin:0;padding:28pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
-.kicker{color:#E8336D;font-size:10pt;margin:0 0 6pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
-h1{color:#E6E9EF;font-size:24pt;margin:0 0 3pt 0;letter-spacing:-0.5pt;}
-.sub{color:#8B95A7;font-size:10pt;margin:0 0 13pt 0;}
-.mono{font-family:'Courier New',monospace;}
-.two{display:flex;gap:18pt;}
-.col{width:311pt;}
-.ct{color:#E6E9EF;font-size:10.5pt;font-weight:bold;margin:0 0 6pt 0;}
-table{border-collapse:collapse;width:311pt;}
-th{color:#8B95A7;font-size:7.5pt;text-align:left;padding:0 4pt 4pt 0;font-family:'Courier New',monospace;font-weight:normal;letter-spacing:0.4pt;}
-td{color:#C6CCD8;font-size:8.5pt;padding:3.5pt 4pt 3.5pt 0;border-top:1px solid #1D242F;line-height:1.25;}
-td.m{font-family:'Courier New',monospace;}
-tr.win td{color:#3ECF8E;font-weight:bold;}
-td.bad{color:#E8336D;font-family:'Courier New',monospace;}
-.note{color:#8B95A7;font-size:9pt;margin:9pt 0 0 0;line-height:1.4;}
+.slide{margin:0;padding:24pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:9pt;margin:0 0 5pt 0;font-weight:bold;letter-spacing:1.5pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:22pt;margin:0 0 3pt 0;letter-spacing:-0.5pt;}
+.sub{color:#8B95A7;font-size:9pt;margin:0 0 11pt 0;}
+.ct{color:#E6E9EF;font-size:9.5pt;font-weight:bold;margin:0 0 4pt 0;}
+.row{display:flex;width:640pt;border-top:1px solid #1D242F;padding:3pt 0 3pt 0;}
+.hrow{display:flex;width:640pt;padding:0 0 3pt 0;}
+.hrow p{color:#8B95A7;font-size:7pt;font-family:'Courier New',monospace;letter-spacing:0.4pt;margin:0;}
+.row p{margin:0;font-size:8pt;color:#C6CCD8;line-height:1.2;}
+.win{border-top:1px solid #3ECF8E;}
+.win p{color:#3ECF8E;font-weight:bold;}
+.c1{width:170pt;}.c2{width:180pt;}.c3{width:210pt;}.c4{width:80pt;}
+.m{font-family:'Courier New',monospace;}
+.note{color:#8B95A7;font-size:8pt;margin:7pt 0 0 0;line-height:1.4;width:640pt;}
 .note b{color:#E6E9EF;font-weight:normal;}
+.gap{margin-top:11pt;}
 </style></head><body><div class="slide">
 <p class="kicker">APPENDIX &nbsp;·&nbsp; CHUNKING AND RETRIEVAL, BY MEASUREMENT</p>
 <h1>Chosen from the standard taxonomy, not by assumption.</h1>
 <p class="sub">4 chunking &times; 4 retrieval strategies &middot; 35 golden questions &middot; k=5 &middot; set-arithmetic scoring, no LLM judge.</p>
-<div class="two">
-<div class="col">
-  <p class="ct">Chunking</p>
-  <table>
-  <tr><th>TECHNIQUE</th><th>CRITERION</th><th>OUTCOME</th></tr>
-  <tr><td>Document-level</td><td class="m">no split</td><td>dilutes signal</td></tr>
-  <tr><td>Fixed-size + sliding window</td><td class="m">512 tok, 64 ovl</td><td>splits tables</td></tr>
-  <tr><td>Document-aware</td><td class="m">headings</td><td>loses provenance</td></tr>
-  <tr class="win"><td>+ contextual header enrichment</td><td class="m">headings + doc, trail, region, dates</td><td>SHIPPED</td></tr>
-  </table>
-  <p class="note"><b>Not evaluated:</b> semantic (structure already encodes the boundaries), parent-child (0.03 headroom), agentic (non-deterministic, 4 files), late chunking (token-level output not exposed by Titan v2).</p>
-</div>
-<div class="col">
-  <p class="ct">Retrieval</p>
-  <table>
-  <tr><th>STRATEGY</th><th>MECHANISM</th><th>MRR</th><th>DATE</th></tr>
-  <tr><td class="m">R1_dense</td><td>ANN, HNSW cosine</td><td class="m">0.89</td><td class="bad">0.40</td></tr>
-  <tr><td class="m">R2_lexical</td><td>sparse FTS, ts_rank_cd</td><td class="m">0.23</td><td class="bad">0.00</td></tr>
-  <tr><td class="m">R3_hybrid</td><td>R1+R2, RRF k=60</td><td class="m">0.92</td><td class="bad">0.40</td></tr>
-  <tr class="win"><td class="m">R4_hybrid_dated</td><td>R3 + metadata pre-filter</td><td>0.87</td><td>1.00</td></tr>
-  </table>
-  <p class="note"><b>R3 dominates R4 on every conventional IR metric and is not shipped.</b> R4 wins the only metric tied to the failure mode. Selecting on MRR reproduces the vendor defect with a better scorecard.</p>
-</div>
-</div>
-<p class="note"><b>Pre-filtering, not post-filtering</b> &mdash; predicate pushdown into the <span class="mono">WHERE</span> of both arms, before ranking. Post-filtering degrades effective k: retrieve 5, discard 3 out-of-period, answer from 2. <b>No cross-encoder re-ranking</b> &mdash; ~0.05 MRR headroom, no rerank model in region, and RRF is fusion, not re-ranking.</p>
+
+<p class="ct">Chunking</p>
+<div class="hrow"><p class="c1">TECHNIQUE</p><p class="c2">SPLITTING CRITERION</p><p class="c3">OUTCOME</p><p class="c4">HIT@5</p></div>
+<div class="row"><p class="c1">Document-level</p><p class="c2 m">no split</p><p class="c3">dilutes topical signal</p><p class="c4 m">0.90</p></div>
+<div class="row"><p class="c1">Fixed-size + sliding window</p><p class="c2 m">512 tok, 64 overlap</p><p class="c3">splits mid-table; severs rule&ndash;date</p><p class="c4 m">0.87</p></div>
+<div class="row"><p class="c1">Document-aware</p><p class="c2 m">heading boundaries</p><p class="c3">structure kept, provenance lost</p><p class="c4 m">0.97</p></div>
+<div class="row win"><p class="c1">+ contextual header enrichment</p><p class="c2 m">+ doc, trail, region, dates</p><p class="c3">SHIPPED &middot; MRR 0.87</p><p class="c4 m">0.97</p></div>
+
+<p class="ct gap">Retrieval</p>
+<div class="hrow"><p class="c1">STRATEGY</p><p class="c2">MECHANISM</p><p class="c3">WHAT IT COSTS</p><p class="c4">MRR &middot; DATE</p></div>
+<div class="row"><p class="c1 m">R1_dense</p><p class="c2">ANN &mdash; HNSW, cosine</p><p class="c3">no exact-identifier recall</p><p class="c4 m">0.89 &middot; 0.40</p></div>
+<div class="row"><p class="c1 m">R2_lexical</p><p class="c2">sparse FTS &mdash; ts_rank_cd</p><p class="c3">vocabulary mismatch</p><p class="c4 m">0.23 &middot; 0.00</p></div>
+<div class="row"><p class="c1 m">R3_hybrid</p><p class="c2">R1 + R2, fused RRF k=60</p><p class="c3">answers the wrong month</p><p class="c4 m">0.92 &middot; 0.40</p></div>
+<div class="row win"><p class="c1 m">R4_hybrid_dated</p><p class="c2">R3 + metadata pre-filter</p><p class="c3">SHIPPED &middot; lower MRR, correct dates</p><p class="c4 m">0.87 &middot; 1.00</p></div>
+
+<p class="note"><b>R3 dominates R4 on every conventional IR metric and is not shipped.</b> R4 wins the only metric tied to the failure mode. Selecting on MRR reproduces the vendor defect with a better scorecard. <b>Not evaluated:</b> semantic, parent-child, agentic, late chunking &mdash; reasons in the repo. <b>No cross-encoder re-ranking:</b> ~0.05 MRR headroom, no rerank model in region, and RRF is fusion, not re-ranking.</p>
 </div></body></html>
 <!--NOTES
-Appendix. Pull this up when asked how chunking or retrieval was chosen.
+Appendix. Pull up when asked how the chunking or retrieval choice was made.
 
-The taxonomy framing is the point: these are the standard techniques, four
-were run, and the ones that weren't have a stated reason rather than silence.
+The point of the slide is the two green rows, and that neither of them won
+on the metric you would normally select by.
 
-Left column, the one line that matters: the winner is document-aware chunking
-with contextual header enrichment -- every chunk carries its document title,
-heading trail, region and effective dates. That metadata is per chunk, not per
-document, which is the only reason a temporal predicate works at chunk
-granularity.
+D_heading_context ties hit@5 with plain document-aware chunking at 0.97. It
+ships because the header prefix carries the document, the heading trail, the
+region and the effective dates INTO the embedded text, which is what makes a
+temporal predicate possible at chunk granularity. Metadata is per chunk, not
+per document.
 
-Right column: R3 beats R4 on hit@5, MRR and precision. R4 ships. The only
-column R4 wins is temporal correctness, and that is the column the incident
-was about.
+R4 is the sharper story. R3 beats it on MRR, on precision, on everything a
+retrieval paper would report -- and R3 answers the wrong month on three of
+the five date-dependent questions, which are precisely the questions that
+caused the incident. DATE 0.40 against 1.00. Selecting on MRR here
+reproduces the vendor defect with a better scorecard.
 
-Pre-filter vs post-filter is worth saying precisely: predicates are pushed
-into the WHERE of BOTH the ANN and the FTS arm before either ranks. Filtering
-after the search silently shrinks k.
-
-Why no re-ranker: ~0.05 of MRR headroom, no amazon.rerank or cohere.rerank in
-ap-southeast-2, and the LLM substitute costs 300ms of a 3-second gate. And be
-precise -- RRF merges two rankings, it never scores query and passage jointly,
-so it is not a cross-encoder.
+If pushed on re-ranking: RRF is fusion, not re-ranking. It merges two
+rankings and never scores query and passage jointly, so it is not a
+cross-encoder and I do not claim it as one.
 -->

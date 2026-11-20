@@ -113,6 +113,38 @@ def handler(event, _context):
                "priority"}
     clean = {k: v for k, v in payload.items() if k in allowed}
 
+    # The portal is a nested document, so it gets its own schema rather than
+    # being waved through as one opaque key. Note what this does NOT do: it
+    # does not decide WHICH organisation the caller may read. That is bound
+    # to a signed session by the web server, which is the only holder of the
+    # key that reaches this function. Validating here keeps a malformed or
+    # oversized document away from the runtime; it is not the authorisation.
+    port = payload.get("portal")
+    if isinstance(port, dict):
+        op = str(port.get("op") or "tickets")
+        if op not in {"tickets", "resolve"}:
+            return _reply(400, {"error": "unknown portal op"})
+        cid = str(port.get("customer_id") or "")[:40]
+        region = str(port.get("region") or "").upper()[:8]
+        if not cid or region not in {"IN", "UAE"}:
+            return _reply(400, {"error": "portal needs customer_id and region"})
+        sub = {"op": op, "customer_id": cid, "region": region}
+        if op == "tickets":
+            state = str(port.get("state") or "all")
+            sub["state"] = state if state in {"open", "resolved", "all"} else "all"
+            try:
+                sub["limit"] = max(1, min(int(port.get("limit") or 50), 200))
+                sub["offset"] = max(0, int(port.get("offset") or 0))
+            except (TypeError, ValueError):
+                return _reply(400, {"error": "limit and offset must be numbers"})
+        else:
+            tid = str(port.get("ticket_id") or "")[:64]
+            if not tid:
+                return _reply(400, {"error": "resolve needs a ticket_id"})
+            sub["ticket_id"] = tid
+            sub["resolved"] = bool(port.get("resolved", True))
+        clean["portal"] = sub
+
     try:
         response = _client.invoke_agent_runtime(
             agentRuntimeArn=RUNTIME_ARN,

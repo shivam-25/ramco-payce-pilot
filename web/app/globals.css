@@ -367,3 +367,81 @@ input[type="date"] { font: inherit; background: none; border: 0; color: var(--in
 .stagerow .sn { font-size: 11px; color: var(--ink); }
 .stagerow .sv { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 .stagenote { margin: 0; font-size: 11px; color: var(--dim); }
+
+/* ---------------------------------------------------------------- portal
+   The customer-facing view: one organisation's own tickets. Deliberately
+   quieter than the operator console -- a customer is checking on their own
+   requests, not operating a pipeline. */
+.pwrap { max-width: 1040px; margin: 0 auto;
+         padding: 24px max(16px, env(safe-area-inset-right, 0px))
+                  64px max(16px, env(safe-area-inset-left, 0px)); }
+.phead { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
+         justify-content: space-between; border-bottom: 1px solid var(--line);
+         padding-bottom: 14px; margin-bottom: 22px; }
+.pbrand { margin: 0; font-weight: 700; font-size: 15px; color: var(--ink); }
+.pmuted { margin: 4px 0 0; color: var(--dim); font-size: 13px; line-height: 1.5; }
+.pwho { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.porg { display: flex; align-items: center; gap: 7px; font-size: 13px;
+        color: var(--ink); }
+.pchip { border: 1px solid var(--line); border-radius: 999px;
+         padding: 1px 8px; font-size: 11px; color: var(--dim); }
+.pavatar { width: 26px; height: 26px; border-radius: 999px;
+           background: var(--accent); color: #fff; display: grid;
+           place-items: center; font-size: 12px; font-weight: 700; }
+.plink { background: none; border: 0; color: var(--accent); cursor: pointer;
+         font: inherit; font-size: 13px; text-decoration: underline; padding: 0; }
+.ph1 { margin: 0 0 6px; font-size: 26px; color: var(--ink);
+       letter-spacing: -0.3px; }
+
+.ptabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 14px; }
+.ptab { border: 1px solid var(--line); background: var(--panel);
+        color: var(--dim); border-radius: 999px; padding: 6px 14px;
+        font: inherit; font-size: 13px; cursor: pointer; }
+.ptab.on { border-color: var(--accent); color: var(--ink); }
+.ptab .pn { font-family: var(--mono); font-size: 12px; opacity: 0.8;
+            margin-left: 4px; }
+
+.plist { list-style: none; margin: 0; padding: 0;
+         border: 1px solid var(--line); border-radius: 10px;
+         overflow: hidden; }
+.prow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+        justify-content: space-between; padding: 13px 15px;
+        border-top: 1px solid var(--line); }
+.prow:first-child { border-top: 0; }
+.pmain { min-width: 0; flex: 1 1 320px; }
+.psub { margin: 0; font-size: 14px; color: var(--ink); line-height: 1.35; }
+.pmeta { margin: 5px 0 0; display: flex; flex-wrap: wrap; gap: 10px;
+         font-size: 11.5px; color: var(--dim); }
+.pid { font-family: var(--mono); }
+.pcase { font-family: var(--mono); }
+.ppri { font-family: var(--mono); font-weight: 700; }
+.ppri.P1 { color: var(--accent); }
+.ppri.P2 { color: #E8A33D; }
+.pact { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
+.pstate { font-size: 12px; color: var(--dim); }
+.pstate.resolved { color: var(--good, #3ECF8E); }
+.pbtn { border: 1px solid var(--line); background: var(--panel);
+        color: var(--ink); border-radius: 7px; padding: 6px 12px;
+        font: inherit; font-size: 13px; cursor: pointer; }
+.pbtn:hover:not(:disabled) { border-color: var(--accent); }
+.pbtn:disabled { opacity: 0.55; cursor: default; }
+.pbtn.primary { background: var(--accent); border-color: var(--accent);
+                color: #fff; }
+
+.pempty { border: 1px dashed var(--line); border-radius: 10px;
+          padding: 28px 16px; text-align: center; color: var(--dim);
+          font-size: 13px; }
+.perr { color: var(--accent); font-size: 13px; margin: 10px 0 0; }
+
+.plogin { max-width: 440px; }
+.pform { display: grid; gap: 7px; margin: 18px 0 0; }
+.pform label { font-size: 12px; color: var(--dim); }
+.pform input { border: 1px solid var(--line); background: var(--panel);
+               color: var(--ink); border-radius: 7px; padding: 9px 11px;
+               font: inherit; font-size: 14px; }
+.pform .pbtn { margin-top: 8px; }
+.pdemo { margin: 22px 0 0; padding: 12px 14px; border: 1px solid var(--line);
+         border-radius: 9px; font-size: 12px; color: var(--dim);
+         line-height: 1.6; }
+.pdemo b { color: var(--ink); font-weight: 600; }
+.pdemo code { font-family: var(--mono); color: var(--ink); margin: 0 3px; }

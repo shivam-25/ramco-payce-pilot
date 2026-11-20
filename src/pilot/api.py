@@ -36,6 +36,12 @@ class Invocation(BaseModel):
     # wording is not the signal; the field is.
     priority: str | None = None
 
+    # The customer portal. A dict rather than loose fields so the whole
+    # surface is one branch: {"op": "tickets"|"resolve", "customer_id": ...,
+    # "region": ..., ...}. customer_id is put here by the web server from a
+    # signed session cookie, never by the browser -- see portal.py.
+    portal: dict | None = None
+
     # Retrieval sweep, used by the bake-off. The databases are private, so
     # the runtime inside the VPC is the only place this can run. It is not
     # reachable from the internet: the proxy Lambda in front of the public
@@ -246,6 +252,9 @@ def _retrieval_sweep(questions: list[dict], strategies: list[str]) -> dict:
 
 @app.post("/invocations")
 def invocations(payload: Invocation):
+    if payload.portal is not None:
+        return _portal(payload.portal)
+
     if payload.admin == "strip_superseded":
         return _strip_superseded()
 
@@ -274,6 +283,34 @@ def invocations(payload: Invocation):
     out = result.to_dict()
     out["cost"] = {"usd": round(meter.usd, 6), "by_model": meter.by_model()}
     return out
+
+
+def _portal(req: dict) -> dict:
+    """One organisation's own tickets. Every branch is scoped by customer_id
+    inside the SQL, so a caller cannot widen its own scope by asking."""
+    from . import portal as pt
+    from .config import REGIONS
+
+    cid = (req.get("customer_id") or "").strip()
+    region = (req.get("region") or "").strip().upper()
+    if not cid or region not in REGIONS:
+        return {"error": "customer_id and a known region are required"}
+
+    op = req.get("op") or "tickets"
+    if op == "tickets":
+        out = pt.tickets(cid, region,
+                         state=req.get("state") or "all",
+                         limit=int(req.get("limit") or 50),
+                         offset=int(req.get("offset") or 0))
+        out["organisation"] = pt.organisation(cid, region)
+        return out
+    if op == "resolve":
+        tid = (req.get("ticket_id") or "").strip()
+        if not tid:
+            return {"error": "ticket_id is required"}
+        return pt.resolve(cid, region, tid,
+                          resolved=bool(req.get("resolved", True)))
+    return {"error": f"unknown portal op {op!r}"}
 
 
 def _ticket_from(payload: "Invocation"):
