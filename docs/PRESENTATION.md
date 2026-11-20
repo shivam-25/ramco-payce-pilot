@@ -1,7 +1,7 @@
 # Live presentation prep — 15 minutes
 
 Brief's order: **the database, the data, the pilot, the evals, then the cost.**
-The deck follows it. Deck: `docs/ramco-payce-pilot.pptx` — **13 narrative slides, then an appendix of 16.**
+The deck follows it. Deck: `docs/ramco-payce-pilot.pptx` — **14 narrative slides, then an appendix of 16.**
 Every narrative slide carries speaker notes in the pptx; open the presenter view and they are there.
 
 ---
@@ -221,7 +221,8 @@ notes, and every technical slide kept as an appendix rather than deleted.
 | 3 | What the desk costs | $6.03 · 48% cite a source · 48 stale-rule uses |
 | 4 | **Rules in code, judgement in the model** | The one design decision the talk hangs on |
 | 5 | The pipeline | Nine stages, two of them models |
-| 5b | **RAG architecture** | The retrieval path, and why the winner loses on MRR |
+| 5b | **RAG architecture** | Index-time and query-time paths, drawn |
+| 5c | The retrieval trade-off | Why the shipped strategy loses the leaderboard |
 | 6 | **Demo** | Divider + the four things to watch |
 | 7 | Nine gates, eight pass | Four headline numbers |
 | 8 | The two that fail | G2 90%, G5 0.789 — measurement problems |

@@ -45,4 +45,35 @@ timings." -- and go to the demo.
 If asked about stage 9: nine output checks, C1 to C9. A failed check WITHHOLDS
 the draft rather than softening it. Four real drafts were withheld in testing
 on top of the six planted ones.
+
+EXPECT THIS QUESTION: "injection wording varies -- surely a regex misses
+paraphrases? Shouldn't an LLM or Guardrails judge it?"
+
+Concede the premise immediately; it is correct:
+
+"Yes. The pattern screen catches known phrasings and a determined paraphrase
+walks past it. I don't claim otherwise -- and that's why the screen isn't the
+security boundary."
+
+"The boundary is the ABSENCE OF CAPABILITY. The drafting model is given no
+tool. There is no function in this pipeline that can approve a refund, change
+a balance, send to a customer, or read the customer table. Database access is
+read-only. So the worst outcome of a screen that misses is a bad DRAFT that a
+human declines to send. The injection succeeds at persuading a text generator
+and then has nothing to persuade it to do."
+
+That claim is asserted in code, not assumed: the pipeline declares its
+capability set, and the forbidden set -- approve_refund, set_invoice_balance,
+issue_payment, list_all_customers, list_admin_emails, send_to_customer -- is
+tested as unreachable from the drafting path. Gate G4 asserts it.
+
+On adding an LLM judge: it would raise recall on paraphrases, and it has two
+problems. It is itself a model being asked to judge text designed to
+manipulate models -- so it is injectable. And it costs a model call on every
+ticket including the hostile ones currently refused for free.
+
+Be straight about the gap: Bedrock Guardrails IS available in this region and
+I am not using it. That's the right place for an out-of-band paraphrase
+filter, and it's on the list. It would sit BESIDE the screen as defence 1.5 --
+it would not become the boundary, because no probabilistic filter should be.
 -->

@@ -1,95 +1,76 @@
 <!DOCTYPE html><html><head><style>
 html{background:#0B0E14;}
 body{width:720pt;height:405pt;margin:0;padding:0;background:#0B0E14;font-family:Arial,Helvetica,sans-serif;display:flex;}
-.slide{margin:0;padding:30pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
-.kicker{color:#E8336D;font-size:10pt;margin:0 0 7pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
-h1{color:#E6E9EF;font-size:27pt;margin:0 0 4pt 0;letter-spacing:-0.5pt;line-height:1.12;}
-.sub{color:#8B95A7;font-size:10.5pt;margin:0 0 14pt 0;line-height:1.4;}
+.slide{margin:0;padding:28pt 40pt;width:720pt;height:405pt;box-sizing:border-box;}
+.kicker{color:#E8336D;font-size:10pt;margin:0 0 6pt 0;font-weight:bold;letter-spacing:1.6pt;font-family:'Courier New',monospace;}
+h1{color:#E6E9EF;font-size:25pt;margin:0 0 14pt 0;letter-spacing:-0.5pt;}
 .mono{font-family:'Courier New',monospace;}
-.two{display:flex;gap:16pt;}
-.col{width:312pt;}
-.ct{color:#E6E9EF;font-size:11pt;font-weight:bold;margin:0 0 8pt 0;}
-.step{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:7pt 10pt;margin:0 0 5pt 0;}
-.step.hi{border:1.5pt solid #3ECF8E;background:#101A16;}
-.sn{color:#E6E9EF;font-size:10.5pt;font-weight:bold;margin:0;}
-.sd{color:#8B95A7;font-size:9pt;margin:2pt 0 0 0;font-family:'Courier New',monospace;}
-table{border-collapse:collapse;width:312pt;}
-th{color:#8B95A7;font-size:8.5pt;text-align:left;padding:0 5pt 5pt 0;font-family:'Courier New',monospace;font-weight:normal;letter-spacing:0.4pt;}
-td{color:#C6CCD8;font-size:9.5pt;padding:4pt 5pt 4pt 0;font-family:'Courier New',monospace;border-top:1px solid #1D242F;}
-td.n{color:#E6E9EF;}
-tr.win td{color:#3ECF8E;font-weight:bold;}
-.note{color:#8B95A7;font-size:9.5pt;margin:9pt 0 0 0;line-height:1.45;}
+.lane{color:#8B95A7;font-size:8.5pt;margin:0 0 6pt 0;font-family:'Courier New',monospace;letter-spacing:1.2pt;}
+.flow{display:flex;align-items:center;gap:7pt;margin:0 0 15pt 0;}
+.bx{background:#141922;border:1px solid #242C3A;border-radius:5pt;padding:8pt 9pt;box-sizing:border-box;height:58pt;}
+.bx.key{border:1.5pt solid #3ECF8E;background:#101A16;}
+.bx.mdl{border:1.5pt solid #E8336D;background:#1C1420;}
+.bn{color:#E6E9EF;font-size:9.5pt;font-weight:bold;margin:0 0 2pt 0;line-height:1.2;}
+.bd{color:#8B95A7;font-size:8pt;margin:0;font-family:'Courier New',monospace;line-height:1.3;}
+.ar{color:#3A4454;font-size:13pt;margin:0;}
+.pair{display:flex;flex-direction:column;gap:4pt;}
+.bx.sm{height:27pt;padding:5pt 9pt;}
+.bx.sm .bn{font-size:9pt;margin:0;}
+.foot{color:#8B95A7;font-size:9.5pt;margin:0;line-height:1.5;}
+.foot b{color:#E6E9EF;font-weight:normal;}
 </style></head><body><div class="slide">
-<p class="kicker">RETRIEVAL &nbsp;·&nbsp; CHOSEN BY BAKE-OFF, NOT BY ASSUMPTION</p>
-<h1>The strategy I shipped loses the leaderboard.</h1>
-<p class="sub">4 chunking &times; 4 retrieval strategies, 35 golden questions at k=5, scored with set arithmetic &mdash; no model judge.</p>
-<div class="two">
-<div class="col">
-  <p class="ct">The retrieval path</p>
-  <div class="step"><p class="sn">Chunk on headings, carry the trail</p><p class="sd">doc title + heading + effective dates</p></div>
-  <div class="step"><p class="sn">Embed &mdash; Titan v2 @ 512 dims</p><p class="sd">no loss vs 1024 here &middot; half the index</p></div>
-  <div class="step hi"><p class="sn">Filter to the rule in force on the date</p><p class="sd">SQL, before ranking &mdash; not after</p></div>
-  <div class="step"><p class="sn">Rank twice &mdash; pgvector HNSW + tsvector</p><p class="sd">dense for meaning, lexical for IDs</p></div>
-  <div class="step"><p class="sn">Fuse with Reciprocal Rank Fusion</p><p class="sd">no score calibration needed</p></div>
+<p class="kicker">RAG ARCHITECTURE</p>
+<h1>Two paths: one built once, one run per ticket.</h1>
+
+<p class="lane">INDEX TIME &nbsp;&middot;&nbsp; ONE-OFF, $2.21</p>
+<div class="flow">
+  <div class="bx" style="width:148pt;"><p class="bn">4 policy documents</p><p class="bd">runbook, SLA, SOP,<br>escalation policy</p></div>
+  <p class="ar">&rarr;</p>
+  <div class="bx key" style="width:160pt;"><p class="bn">Chunk on headings</p><p class="bd">doc title, heading trail,<br>region, effective DATES</p></div>
+  <p class="ar">&rarr;</p>
+  <div class="bx" style="width:140pt;"><p class="bn">Titan Embed v2</p><p class="bd">512 dims &middot; no loss<br>vs 1024, half the index</p></div>
+  <p class="ar">&rarr;</p>
+  <div class="bx" style="width:140pt;"><p class="bn">Postgres, one per region</p><p class="bd">pgvector HNSW<br>+ tsvector GIN</p></div>
 </div>
-<div class="col">
-  <p class="ct">Why the winner is not the top row</p>
-  <table>
-  <tr><th>STRATEGY</th><th>MRR</th><th>PREC</th><th>DATE</th></tr>
-  <tr class="win"><td>R4 hybrid + dated</td><td>0.87</td><td>0.46</td><td>1.00</td></tr>
-  <tr><td>R3 hybrid</td><td class="n">0.92</td><td class="n">0.50</td><td style="color:#E8336D;">0.40</td></tr>
-  <tr><td>R1 dense only</td><td class="n">0.89</td><td class="n">0.51</td><td style="color:#E8336D;">0.40</td></tr>
-  <tr><td>R2 lexical only</td><td>0.23</td><td>0.21</td><td style="color:#E8336D;">0.00</td></tr>
-  </table>
-  <p class="note">Plain hybrid beats the winner on <span class="mono">every</span> metric a bake-off normally reports &mdash; and gets 3 of 5 dated questions wrong. Those are the questions that caused the incident.</p>
-  <p class="note">Choosing on MRR would have shipped the vendor&rsquo;s bug again, with better numbers attached.</p>
+
+<p class="lane">QUERY TIME &nbsp;&middot;&nbsp; PER TICKET, ~1.5s</p>
+<div class="flow">
+  <div class="bx" style="width:104pt;"><p class="bn">Masked ticket<br>+ as_of date</p><p class="bd">an input, not an<br>afterthought</p></div>
+  <p class="ar">&rarr;</p>
+  <div class="bx key" style="width:132pt;"><p class="bn">PRE-FILTER in SQL</p><p class="bd">region + rule in force<br>that date, before ranking</p></div>
+  <p class="ar">&rarr;</p>
+  <div class="pair" style="width:118pt;">
+    <div class="bx sm"><p class="bn">Dense &middot; HNSW cosine</p></div>
+    <div class="bx sm"><p class="bn">Lexical &middot; ts_rank_cd</p></div>
+  </div>
+  <p class="ar">&rarr;</p>
+  <div class="bx" style="width:86pt;"><p class="bn">RRF fuse</p><p class="bd">k=60<br>top 5</p></div>
+  <p class="ar">&rarr;</p>
+  <div class="bx mdl" style="width:106pt;"><p class="bn">Nova Pro drafts</p><p class="bd">with citations,<br>or refuses</p></div>
 </div>
-</div>
+
+<p class="foot"><b>No re-ranker.</b> Ordering is already MRR 0.95 / hit@5 0.97 &mdash; about 0.05 of headroom &mdash; while faithfulness and corpus coverage are the real limits. <span class="mono">ap-southeast-2</span> also offers no rerank model, and RRF is fusion, not re-ranking: it reorders two lists, it never scores a query and passage jointly.</p>
 </div></body></html>
 <!--NOTES
-This is the slide that proves the measurement was real rather than decorative.
+Walk the two lanes, don't read the boxes.
 
-"Four chunking strategies, four retrieval strategies, thirty-five golden
-questions. Scored with set arithmetic, not a judge model, so the measurement
-can't flatter itself."
+TOP LANE, built once for $2.21: "Four policy documents, chunked on headings,
+and every chunk carries its document title, heading trail, region AND
+effective dates. That last part is why the date filter is possible at all."
 
-Point at the table: "Look at the second row. By every metric a retrieval
-bake-off normally reports -- MRR, precision -- plain hybrid BEATS what I
-shipped. It is also wrong on three of the five date-dependent questions."
+BOTTOM LANE, per ticket: "The date the customer is asking about is an INPUT,
+not an afterthought. It filters in SQL, BEFORE anything is ranked."
 
-"Those are exactly the questions that caused the incident this pilot exists to
-prevent. So I shipped the strategy that loses the leaderboard and is right
-about dates. Choosing on MRR would have shipped the vendor's bug again, with
-better numbers attached."
+The line worth landing: "Filtering after the search silently shrinks k. You
+ask for five passages, three are out of period, and you answer from two. By
+filtering first, the ranker only ever sees passages that were in force."
 
-The left column if asked: the date filter runs in SQL BEFORE ranking, not
-after -- filtering after the search silently shrinks k, which is how you
-retrieve five passages and keep one.
+Then: "Two searches -- dense for meaning, lexical for exact IDs like a ticket
+number that embeddings blur -- fused with Reciprocal Rank Fusion. RRF is
+rank-based, so it needs no score calibration between two scales that aren't
+comparable."
 
-A hypothesis that died: lexical-only scored 0.23. Tickets say "salary not
-credited", rules say "wage ceiling" -- keyword matching has nothing to grip.
-Kept in the fusion only because it rescues exact IDs like PNJ-5107 that
-embeddings blur.
-
-EXPECT THIS QUESTION: "why no re-ranker?" Three answers, in order:
-
-1. It would optimise the part that already works. Ordering is MRR 0.95,
-   nDCG 0.95, hit@5 0.97 -- about 0.05 of headroom. Faithfulness and corpus
-   coverage are the bottleneck, not ranking.
-2. No re-ranker model exists on this account. ap-southeast-2 has no
-   amazon.rerank or cohere.rerank, only Cohere EMBEDDING models, and the SCP
-   pins us to that region. Self-hosting a cross-encoder means Torch and
-   weights in a 24MB artifact plus CPU inference on the request path.
-3. The affordable substitute -- one Nova Micro call scoring 15 candidates --
-   is ~$0.00002 and 300ms. That 300ms lands on a path with a 3-second gate,
-   to win 0.05 of MRR.
-
-And be precise if pushed: RRF is FUSION, not re-ranking. It reorders two
-existing rankings; it never scores query and passage jointly, so it is not a
-cross-encoder and I don't claim it as one.
-
-Other specifics if asked: Titan embed v2 at 512 dims (no measured loss vs
-1024, half the index). pgvector HNSW over IVFFlat because the corpus is small
-and read-heavy -- slower build, faster queries, no training step or list
-tuning. RRF k=60, the original paper's constant. Top-5 out.
+No re-ranker, if asked: 0.05 of MRR headroom, no rerank model in region, and
+the LLM substitute spends 300ms of a 3-second gate to win it. Full answer in
+the next slide's notes.
 -->
